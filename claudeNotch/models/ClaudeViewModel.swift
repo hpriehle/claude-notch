@@ -1,0 +1,192 @@
+//
+//  ClaudeViewModel.swift
+//  claudeNotch
+//
+//  Created by Harsh Vardhan Goswami on 04/08/24.
+//  Modified for ClaudeNotch by Harrison Riehle on 2026. 01. 14..
+//
+
+import Combine
+import Defaults
+import SwiftUI
+
+class ClaudeViewModel: NSObject, ObservableObject {
+    @ObservedObject var coordinator = ClaudeViewCoordinator.shared
+
+    let animationLibrary: BoringAnimations = .init()
+    let animation: Animation?
+
+    @Published var contentType: ContentType = .normal
+    @Published private(set) var notchState: NotchState = .closed
+
+    var cancellables: Set<AnyCancellable> = []
+
+    @Published var hideOnClosed: Bool = false
+
+    @Published var edgeAutoOpenActive: Bool = false
+
+    @Published var screenUUID: String?
+
+    @Published var notchSize: CGSize = getClosedNotchSize()
+    @Published var closedNotchSize: CGSize = getClosedNotchSize()
+
+    let webcamManager = WebcamManager.shared
+    @Published var isCameraExpanded: Bool = false
+    @Published var isRequestingAuthorization: Bool = false
+
+    // Claude-specific properties
+    @Published var usageData: ClaudeUsageData = .testData
+    @Published var isExtensionConnected: Bool = false
+
+    private var usageDataObserver: Any?
+
+    deinit {
+        destroy()
+    }
+
+    func destroy() {
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+        if let observer = usageDataObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    init(screenUUID: String? = nil) {
+        animation = animationLibrary.animation
+
+        super.init()
+
+        self.screenUUID = screenUUID
+        notchSize = getClosedNotchSize(screenUUID: screenUUID)
+        closedNotchSize = notchSize
+
+        setupUsageDataListener()
+    }
+
+    private func setupUsageDataListener() {
+        usageDataObserver = NotificationCenter.default.addObserver(
+            forName: .claudeUsageDataReceived,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            if let data = notification.userInfo?["data"] as? ClaudeUsageData {
+                self?.usageData = data
+                self?.isExtensionConnected = true
+            }
+        }
+    }
+
+    // Computed property for effective notch height
+    var effectiveClosedNotchHeight: CGFloat {
+        let currentScreen = screenUUID.flatMap { NSScreen.screen(withUUID: $0) }
+        let noNotchAndFullscreen = hideOnClosed && (currentScreen?.safeAreaInsets.top ?? 0 <= 0 || currentScreen == nil)
+        return noNotchAndFullscreen ? 0 : closedNotchSize.height
+    }
+
+    var chinHeight: CGFloat {
+        if !Defaults[.hideTitleBar] {
+            return 0
+        }
+
+        guard let currentScreen = screenUUID.flatMap({ NSScreen.screen(withUUID: $0) }) else {
+            return 0
+        }
+
+        if notchState == .open { return 0 }
+
+        let menuBarHeight = currentScreen.frame.maxY - currentScreen.visibleFrame.maxY
+        let currentHeight = effectiveClosedNotchHeight
+
+        if currentHeight == 0 { return 0 }
+
+        return max(0, menuBarHeight - currentHeight)
+    }
+
+    func toggleCameraPreview() {
+        if isRequestingAuthorization {
+            return
+        }
+
+        switch webcamManager.authorizationStatus {
+        case .authorized:
+            if webcamManager.isSessionRunning {
+                webcamManager.stopSession()
+                isCameraExpanded = false
+            } else if webcamManager.cameraAvailable {
+                webcamManager.startSession()
+                isCameraExpanded = true
+            }
+
+        case .denied, .restricted:
+            DispatchQueue.main.async {
+                NSApp.setActivationPolicy(.regular)
+                NSApp.activate(ignoringOtherApps: true)
+
+                let alert = NSAlert()
+                alert.messageText = "Camera Access Required"
+                alert.informativeText = "Please allow camera access in System Settings."
+                alert.addButton(withTitle: "Open Settings")
+                alert.addButton(withTitle: "Cancel")
+
+                if alert.runModal() == .alertFirstButtonReturn {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+
+                NSApp.setActivationPolicy(.accessory)
+                NSApp.deactivate()
+            }
+
+        case .notDetermined:
+            isRequestingAuthorization = true
+            webcamManager.checkAndRequestVideoAuthorization()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                self.isRequestingAuthorization = false
+            }
+
+        default:
+            break
+        }
+    }
+
+    func isMouseHovering(position: NSPoint = NSEvent.mouseLocation) -> Bool {
+        let screenFrame = getScreenFrame(screenUUID)
+        if let frame = screenFrame {
+            let baseY = frame.maxY - notchSize.height
+            let baseX = frame.midX - notchSize.width / 2
+
+            return position.y >= baseY && position.x >= baseX && position.x <= baseX + notchSize.width
+        }
+
+        return false
+    }
+
+    func open() {
+        self.notchSize = openNotchSize
+        self.notchState = .open
+    }
+
+    func close() {
+        // Do not close while a share picker or sharing service is active
+        if SharingStateManager.shared.preventNotchClose {
+            return
+        }
+        self.notchSize = getClosedNotchSize(screenUUID: self.screenUUID)
+        self.closedNotchSize = self.notchSize
+        self.notchState = .closed
+        self.coordinator.sneakPeek.show = false
+        self.edgeAutoOpenActive = false
+        coordinator.currentView = .home
+    }
+
+    func closeHello() {
+        Task { @MainActor in
+            withAnimation(animationLibrary.animation) {
+                coordinator.helloAnimationRunning = false
+                close()
+            }
+        }
+    }
+}
