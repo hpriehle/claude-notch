@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      width: 250px;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0 0 12px 0;
+      color: #d4a574;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .dot.connected { background: #22c55e; }
+    .dot.disconnected { background: #ef4444; }
+    .info {
+      color: #888;
+      font-size: 12px;
+    }
+    .instructions {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #333;
+      font-size: 11px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <h1>ClaudeNotch Connector</h1>
+  <div class="status">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Checking...</span>
+  </div>
+  <div class="info" id="lastSent"></div>
+  <div class="instructions">
+    <p>Visit claude.ai settings to see usage data flow to ClaudeNotch.</p>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

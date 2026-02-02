@@ -28,6 +28,7 @@ struct ContentView: View {
     @State private var gestureProgress: CGFloat = .zero
 
     @State private var haptics: Bool = false
+    @State private var selectedStatsPage: Int = 0
 
     @Default(.showNotHumanFace) var showNotHumanFace
 
@@ -147,6 +148,17 @@ struct ContentView: View {
                         }
                         .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
                     }
+
+                // Session progress bar below notch (visible in closed state)
+                if vm.notchState == .closed, let sessionPercent = vm.usageData.sessionPercent {
+                    SessionBarView(percent: sessionPercent, color: vm.usageData.colorForPercent(sessionPercent))
+                        .frame(width: vm.closedNotchSize.width)
+                        .padding(.top, 2)
+                        .onTapGesture {
+                            doOpen()
+                        }
+                }
+
                 if vm.chinHeight > 0 {
                     Rectangle()
                         .fill(Color.black.opacity(0.01))
@@ -154,7 +166,7 @@ struct ContentView: View {
                 }
             }
         }
-        .padding(.bottom, 8)
+        .padding(.bottom, vm.notchState == .open ? 8 : 0)
         .frame(maxWidth: windowSize.width, maxHeight: windowSize.height, alignment: .top)
         .compositingGroup()
         .scaleEffect(
@@ -195,9 +207,10 @@ struct ContentView: View {
                         // Show face animation if enabled
                         BoringFaceAnimation()
                     } else if vm.notchState == .closed {
-                        // Closed state: show compact Claude view
-                        ClaudeCompactView()
-                            .frame(height: vm.effectiveClosedNotchHeight)
+                        // Closed state: show nothing inside notch (session bar is shown below)
+                        Rectangle()
+                            .fill(.clear)
+                            .frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                     } else {
                         Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                     }
@@ -231,17 +244,64 @@ struct ContentView: View {
             }
             .zIndex(2)
 
-            // Expanded content
+            // Expanded content - swipeable pages
             if vm.notchState == .open {
-                ClaudeUsageView()
-                    .transition(
-                        .scale(scale: 0.8, anchor: .top)
-                        .combined(with: .opacity)
-                        .animation(.smooth(duration: 0.35))
+                VStack(spacing: 0) {
+                    // Page indicator dots (clickable)
+                    HStack(spacing: 6) {
+                        ForEach(0..<2, id: \.self) { index in
+                            Circle()
+                                .fill(selectedStatsPage == index ? Color.white : Color.white.opacity(0.3))
+                                .frame(width: 6, height: 6)
+                                .onTapGesture {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        selectedStatsPage = index
+                                    }
+                                }
+                        }
+                    }
+                    .padding(.top, 4)
+
+                    // Content with horizontal swipe gesture
+                    ZStack {
+                        if selectedStatsPage == 0 {
+                            ClaudeUsageView()
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .leading).combined(with: .opacity),
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
+                        } else {
+                            StatsDetailView()
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .move(edge: .trailing).combined(with: .opacity)
+                                ))
+                        }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 30)
+                            .onEnded { value in
+                                let horizontalAmount = value.translation.width
+                                if horizontalAmount < -50 && selectedStatsPage < 1 {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        selectedStatsPage = 1
+                                    }
+                                } else if horizontalAmount > 50 && selectedStatsPage > 0 {
+                                    withAnimation(.easeInOut(duration: 0.3)) {
+                                        selectedStatsPage = 0
+                                    }
+                                }
+                            }
                     )
-                    .zIndex(1)
-                    .allowsHitTesting(vm.notchState == .open)
-                    .opacity(gestureProgress != 0 ? 1.0 - min(abs(gestureProgress) * 0.1, 0.3) : 1.0)
+                }
+                .transition(
+                    .scale(scale: 0.8, anchor: .top)
+                    .combined(with: .opacity)
+                    .animation(.smooth(duration: 0.35))
+                )
+                .zIndex(1)
+                .allowsHitTesting(vm.notchState == .open)
+                .opacity(gestureProgress != 0 ? 1.0 - min(abs(gestureProgress) * 0.1, 0.3) : 1.0)
             }
         }
     }

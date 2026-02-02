@@ -80,6 +80,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             screenUnlockedObserver = nil
         }
         cleanupWindows()
+        ClaudeUsageService.shared.stop()
         XPCHelperClient.shared.stopMonitoringAccessibilityAuthorization()
     }
 
@@ -321,6 +322,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             playWelcomeSound()
         }
+
+        // Start Claude usage monitoring service
+        ClaudeUsageService.shared.start()
+
+        // Initialize usage notification manager (subscribes to usage updates)
+        _ = UsageNotificationManager.shared
 
         previousScreens = NSScreen.screens
     }

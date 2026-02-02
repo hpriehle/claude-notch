@@ -36,7 +36,7 @@ struct OnboardingView: View {
                 PermissionRequestView(
                     icon: Image(systemName: "camera.fill"),
                     title: "Enable Camera Access",
-                    description: "Claude Notch includes a mirror feature that lets you quickly check your appearance using your camera, right from the notch. Camera access is required only to show this live preview. You can turn the mirror feature on or off at any time in the app.",
+                    description: "Claude Notch includes an optional mirror feature that lets you quickly check your appearance using your camera, right from the notch. You can enable or disable this feature at any time in settings.",
                     privacyNote: "Your camera is never used without your consent, and nothing is recorded or stored.",
                     onAllow: {
                         Task {
@@ -58,8 +58,8 @@ struct OnboardingView: View {
                 PermissionRequestView(
                     icon: Image(systemName: "hand.raised.fill"),
                     title: "Enable Accessibility Access",
-                    description: "Accessibility access is required to replace system notifications with the Claude Notch HUD. This allows the app to intercept media and brightness events to display custom HUD overlays.",
-                    privacyNote: "Accessibility access is used only to improve media and brightness notifications. No data is collected or shared.",
+                    description: "Accessibility access enables Claude Notch to display custom HUD overlays for brightness and volume controls instead of the system defaults.",
+                    privacyNote: "Accessibility access is used only to enhance system HUD notifications. No data is collected or shared.",
                     onAllow: {
                         Task {
                             await requestAccessibilityPermission()

@@ -22,40 +22,76 @@ struct ClaudeCompactView: View {
                 .fill(vm.isExtensionConnected ? Color.green : Color.gray.opacity(0.5))
                 .frame(width: 6, height: 6)
 
-            // Session percentage
-            if Defaults[.showSessionUsage] {
-                Text("\(vm.usageData.sessionPercent)%")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(vm.usageData.colorForPercent(vm.usageData.sessionPercent))
-
-                Divider()
-                    .frame(height: 10)
-                    .background(Color.gray.opacity(0.3))
+            // Staleness indicator - orange dot when data is old (only show if we have data)
+            if vm.usageData.hasAnyData {
+                let age = Date().timeIntervalSince(vm.usageData.lastUpdated)
+                if age > 300 { // > 5 minutes
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 5, height: 5)
+                }
             }
 
-            // Weekly all-models percentage
-            if Defaults[.showWeeklyAllUsage] {
-                Text("\(vm.usageData.weeklyAllPercent)%")
+            // Show loading state if no data at all
+            if !vm.usageData.hasAnyData {
+                Text("--")
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(vm.usageData.colorForPercent(vm.usageData.weeklyAllPercent))
+                    .foregroundColor(.gray)
+            } else if vm.usageData.hasWebData {
+                // Web data available - show percentages
+                // Session percentage
+                if Defaults[.showSessionUsage], let sessionPercent = vm.usageData.sessionPercent {
+                    Text("\(sessionPercent)%")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(vm.usageData.colorForPercent(sessionPercent))
 
-                Divider()
-                    .frame(height: 10)
-                    .background(Color.gray.opacity(0.3))
+                    Divider()
+                        .frame(height: 10)
+                        .background(Color.gray.opacity(0.3))
+                }
+
+                // Weekly all-models percentage
+                if Defaults[.showWeeklyAllUsage], let weeklyAllPercent = vm.usageData.weeklyAllPercent {
+                    Text("\(weeklyAllPercent)%")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(vm.usageData.colorForPercent(weeklyAllPercent))
+
+                    Divider()
+                        .frame(height: 10)
+                        .background(Color.gray.opacity(0.3))
+                }
+
+                // Reset timer (shows session reset time if available, otherwise weekly)
+                let resetTime = vm.usageData.sessionResetTime ?? vm.usageData.weeklyAllResetTime
+                if resetTime != nil {
+                    Text(displayedResetTime)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(.gray)
+                }
+            } else if vm.usageData.hasCodeData {
+                // Only code data - show token count
+                if let weeklyTokens = vm.usageData.codeWeeklyTokens {
+                    Text(ClaudeUsageData.formatTokenCount(weeklyTokens))
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white)
+                    Text("this week")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.gray)
+                }
             }
-
-            // Reset timer (shows session reset time)
-            Text(displayedResetTime)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundColor(.gray)
         }
         .padding(.horizontal, 12)
         .onAppear {
-            displayedResetTime = ClaudeUsageData.formatShortResetTime(vm.usageData.sessionResetTime)
+            updateResetTime()
         }
         .onReceive(timer) { _ in
-            displayedResetTime = ClaudeUsageData.formatShortResetTime(vm.usageData.sessionResetTime)
+            updateResetTime()
         }
+    }
+
+    private func updateResetTime() {
+        let resetTime = vm.usageData.sessionResetTime ?? vm.usageData.weeklyAllResetTime
+        displayedResetTime = ClaudeUsageData.formatShortResetTime(resetTime)
     }
 }
 

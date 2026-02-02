@@ -9,50 +9,65 @@ import SwiftUI
 import Foundation
 
 struct ClaudeUsageData: Codable, Equatable {
-    var sessionPercent: Int
-    var weeklyAllPercent: Int
-    var weeklySonnetPercent: Int
-    var sessionResetTime: Date
-    var weeklyAllResetTime: Date
-    var weeklySonnetResetTime: Date
-    var accountType: String
+    // Web usage (from browser extension via WebSocket)
+    var sessionPercent: Int?
+    var weeklyAllPercent: Int?
+    var weeklySonnetPercent: Int?
+    var sessionResetTime: Date?
+    var weeklyAllResetTime: Date?
+    var weeklySonnetResetTime: Date?
+
+    // Code usage (from ~/.claude/ logs)
+    var codeWeeklyTokens: Int?
+    var codeTodayTokens: Int?
+    var codeSonnetTokens: Int?
+    var codeOpusTokens: Int?
+
+    // Metadata
+    var accountType: String?
     var isConnected: Bool
     var lastUpdated: Date
 
-    // Static test data for Phase 1 MVP
-    static var testData: ClaudeUsageData {
-        let now = Date()
-        let calendar = Calendar.current
+    // MARK: - Empty Initial State
 
-        // Session resets in ~5 hours
-        let sessionReset = now.addingTimeInterval(5 * 3600)
-
-        // Weekly all-models resets next Tuesday at 9 AM
-        let weeklyAllReset = calendar.nextDate(
-            after: now,
-            matching: DateComponents(hour: 9, minute: 0, weekday: 3),
-            matchingPolicy: .nextTime
-        ) ?? now.addingTimeInterval(7 * 24 * 3600)
-
-        // Weekly Sonnet resets next Tuesday at 11 AM
-        let weeklySonnetReset = calendar.nextDate(
-            after: now,
-            matching: DateComponents(hour: 11, minute: 0, weekday: 3),
-            matchingPolicy: .nextTime
-        ) ?? now.addingTimeInterval(7 * 24 * 3600)
-
-        return ClaudeUsageData(
-            sessionPercent: 0,
-            weeklyAllPercent: 22,
-            weeklySonnetPercent: 0,
-            sessionResetTime: sessionReset,
-            weeklyAllResetTime: weeklyAllReset,
-            weeklySonnetResetTime: weeklySonnetReset,
-            accountType: "Pro",
+    static var empty: ClaudeUsageData {
+        ClaudeUsageData(
+            sessionPercent: nil,
+            weeklyAllPercent: nil,
+            weeklySonnetPercent: nil,
+            sessionResetTime: nil,
+            weeklyAllResetTime: nil,
+            weeklySonnetResetTime: nil,
+            codeWeeklyTokens: nil,
+            codeTodayTokens: nil,
+            codeSonnetTokens: nil,
+            codeOpusTokens: nil,
+            accountType: nil,
             isConnected: false,
-            lastUpdated: now
+            lastUpdated: Date()
         )
     }
+
+    // MARK: - Computed Properties
+
+    var hasWebData: Bool {
+        return sessionPercent != nil || weeklyAllPercent != nil
+    }
+
+    var hasCodeData: Bool {
+        return codeWeeklyTokens != nil && codeWeeklyTokens! > 0
+    }
+
+    var hasAnyData: Bool {
+        return hasWebData || hasCodeData
+    }
+
+    // Display-friendly percentages (default to 0 if nil)
+    var displaySessionPercent: Int { sessionPercent ?? 0 }
+    var displayWeeklyAllPercent: Int { weeklyAllPercent ?? 0 }
+    var displayWeeklySonnetPercent: Int { weeklySonnetPercent ?? 0 }
+
+    // MARK: - Color Helpers
 
     /// Returns color based on usage percentage thresholds
     func colorForPercent(_ percent: Int) -> Color {
@@ -68,8 +83,19 @@ struct ClaudeUsageData: Codable, Equatable {
         }
     }
 
+    /// Returns color for optional percent
+    func colorForOptionalPercent(_ percent: Int?) -> Color {
+        guard let p = percent else {
+            return Color.gray
+        }
+        return colorForPercent(p)
+    }
+
+    // MARK: - Time Formatting
+
     /// Format reset time as human-readable string
-    static func formatResetTime(_ date: Date) -> String {
+    static func formatResetTime(_ date: Date?) -> String {
+        guard let date = date else { return "--" }
         let interval = date.timeIntervalSinceNow
         guard interval > 0 else { return "Now" }
 
@@ -98,7 +124,8 @@ struct ClaudeUsageData: Codable, Equatable {
     }
 
     /// Format reset time as short string for compact view
-    static func formatShortResetTime(_ date: Date) -> String {
+    static func formatShortResetTime(_ date: Date?) -> String {
+        guard let date = date else { return "--:--" }
         let interval = date.timeIntervalSinceNow
         guard interval > 0 else { return "00:00" }
 
@@ -113,6 +140,21 @@ struct ClaudeUsageData: Codable, Equatable {
         } else {
             let days = Int(interval / 86400)
             return "\(days)d"
+        }
+    }
+
+    // MARK: - Token Formatting
+
+    /// Format token count for display
+    static func formatTokenCount(_ tokens: Int?) -> String {
+        guard let tokens = tokens, tokens > 0 else { return "0" }
+
+        if tokens >= 1_000_000 {
+            return String(format: "%.1fM", Double(tokens) / 1_000_000)
+        } else if tokens >= 1_000 {
+            return String(format: "%.1fK", Double(tokens) / 1_000)
+        } else {
+            return "\(tokens)"
         }
     }
 }

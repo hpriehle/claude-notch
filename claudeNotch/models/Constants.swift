@@ -96,4 +96,8 @@ extension Defaults.Keys {
     static let usageWarningThreshold = Key<Int>("usageWarningThreshold", default: 75)
     static let usageCriticalThreshold = Key<Int>("usageCriticalThreshold", default: 90)
     static let webSocketPort = Key<UInt16>("webSocketPort", default: 8765)
+
+    // MARK: Usage Notifications
+    static let enableUsageNotifications = Key<Bool>("enableUsageNotifications", default: true)
+    static let usageNotificationThresholds = Key<[Int]>("usageNotificationThresholds", default: [70, 85, 95])
 }
