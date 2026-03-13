@@ -9,11 +9,57 @@ import SwiftUI
 import Defaults
 import AppKit
 
-/// Expanded view showing full Claude usage statistics
+/// Expanded view showing full Claude usage statistics, with a second history page.
 struct ClaudeUsageView: View {
     @EnvironmentObject var vm: ClaudeViewModel
 
+    // Set to false to disable the history page entirely (safe kill switch)
+    private static let historyPageEnabled = true
+    private let pageCount = 2
+
+    @State private var selectedPage: Int = 0
+    private let pageDetector = HorizontalScrollPageDetector()
+
     var body: some View {
+        ZStack(alignment: .bottom) {
+            GeometryReader { geo in
+                HStack(spacing: 0) {
+                    usagePage
+                        .frame(width: geo.size.width)
+                    if Self.historyPageEnabled {
+                        UsageHistoryView()
+                            .frame(width: geo.size.width)
+                    }
+                }
+                .offset(x: -CGFloat(selectedPage) * geo.size.width)
+                .animation(.spring(response: 0.38, dampingFraction: 0.85), value: selectedPage)
+            }
+            .clipped()
+
+            if Self.historyPageEnabled {
+                pageDots
+                    .padding(.bottom, 8)
+            }
+        }
+        .onChange(of: vm.notchState) { _, newState in
+            if newState == .open {
+                startPageDetector()
+            } else {
+                stopPageDetector()
+                selectedPage = 0
+            }
+        }
+        .onAppear {
+            if vm.notchState == .open { startPageDetector() }
+        }
+        .onDisappear {
+            stopPageDetector()
+        }
+    }
+
+    // MARK: - Page 0: existing usage content (unchanged logic)
+
+    private var usagePage: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
             HStack {
@@ -107,7 +153,49 @@ struct ClaudeUsageView: View {
         }
         .padding(.horizontal, 28)  // Avoid corner clipping (corner radius is 24pt)
         .padding(.top, 16)
-        .padding(.bottom, 28)      // Extra bottom padding for rounded corners
+        .padding(.bottom, 28)
+    }
+
+    // MARK: - Page indicator dots
+
+    private var pageDots: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<pageCount, id: \.self) { idx in
+                Button(action: {
+                    withAnimation(.spring(response: 0.38, dampingFraction: 0.85)) {
+                        selectedPage = idx
+                    }
+                }) {
+                    Circle()
+                        .fill(idx == selectedPage
+                              ? Color.white.opacity(0.8)
+                              : Color.white.opacity(0.25))
+                        .frame(
+                            width:  idx == selectedPage ? 6 : 4,
+                            height: idx == selectedPage ? 6 : 4
+                        )
+                        .animation(.easeInOut(duration: 0.15), value: selectedPage)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - Scroll detector
+
+    private func startPageDetector() {
+        guard Self.historyPageEnabled else { return }
+        pageDetector.onPageChange = { [self] direction in
+            let next = max(0, min(pageCount - 1, selectedPage + direction))
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.85)) {
+                selectedPage = next
+            }
+        }
+        pageDetector.start()
+    }
+
+    private func stopPageDetector() {
+        pageDetector.stop()
     }
 }
 

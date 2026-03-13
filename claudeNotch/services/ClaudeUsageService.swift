@@ -319,6 +319,8 @@ class ClaudeUsageService: ObservableObject {
             self.currentUsage = updatedUsage
             self.updatePredictions(from: updatedUsage)
             self.postNotification()
+            UsageHistoryStore.shared.record(self.currentUsage)
+            NotificationCenter.default.post(name: .usageHistoryUpdated, object: nil)
             print("[ClaudeUsageService \(self.ts())] POSTED: session=\(self.currentUsage.sessionPercent ?? -1)%, weekly=\(self.currentUsage.weeklyAllPercent ?? -1)%")
         }
     }
