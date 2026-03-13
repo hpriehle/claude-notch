@@ -84,33 +84,35 @@ struct StatsDetailView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.gray)
 
-                if vm.usageData.hasWebData {
+                if vm.usageData.hasOAuthData || vm.usageData.hasWebData {
                     // Weekly forecast
-                    if let weeklyPercent = vm.usageData.weeklyAllPercent {
+                    let weeklyPercent = vm.usageData.oauthWeeklyAllPercent ?? vm.usageData.weeklyAllPercent
+                    if let weeklyPercent = weeklyPercent {
                         RateLimitRow(
                             label: "Weekly",
                             percent: weeklyPercent,
-                            resetTime: vm.usageData.weeklyAllResetTime,
+                            resetTime: vm.usageData.displayWeeklyAllResetTime,
                             prediction: calculatePrediction(percent: weeklyPercent)
                         )
                     }
 
                     // Session forecast
-                    if let sessionPercent = vm.usageData.sessionPercent {
+                    let sessionPercent = vm.usageData.oauthSessionPercent ?? vm.usageData.sessionPercent
+                    if let sessionPercent = sessionPercent {
                         RateLimitRow(
                             label: "Session",
                             percent: sessionPercent,
-                            resetTime: vm.usageData.sessionResetTime,
+                            resetTime: vm.usageData.displaySessionResetTime,
                             prediction: nil  // Session is short-term, no velocity prediction
                         )
                     }
                 } else {
-                    // No web data - show prompt
+                    // No API or web data - show prompt
                     HStack {
                         Image(systemName: "link.badge.plus")
                             .font(.system(size: 12))
                             .foregroundColor(.gray)
-                        Text("Connect browser extension for rate limit data")
+                        Text("Connect Claude Code for rate limit data")
                             .font(.system(size: 10))
                             .foregroundColor(.gray)
                     }

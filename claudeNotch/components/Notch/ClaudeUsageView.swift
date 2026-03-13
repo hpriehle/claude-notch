@@ -44,36 +44,43 @@ struct ClaudeUsageView: View {
             }
             .padding(.bottom, 4)
 
-            // Show empty state if no data
+            // Show empty state or loading state if no data
             if !vm.usageData.hasAnyData {
-                EmptyUsageView()
+                if ClaudeUsageService.shared.hasOAuthData {
+                    LoadingUsageView()
+                } else {
+                    EmptyUsageView()
+                }
             } else {
-                // Session Usage
-                if Defaults[.showSessionUsage], let sessionPercent = vm.usageData.sessionPercent {
+                // Session Usage (prefer OAuth, fallback to web extension)
+                let sessionPercent = vm.usageData.oauthSessionPercent ?? vm.usageData.sessionPercent
+                if Defaults[.showSessionUsage], let sessionPercent = sessionPercent {
                     UsageBarView(
                         label: "Session",
                         percent: sessionPercent,
-                        resetTime: vm.usageData.sessionResetTime,
+                        resetTime: vm.usageData.displaySessionResetTime,
                         color: vm.usageData.colorForPercent(sessionPercent)
                     )
                 }
 
                 // Weekly All Models Usage
-                if Defaults[.showWeeklyAllUsage], let weeklyAllPercent = vm.usageData.weeklyAllPercent {
+                let weeklyAllPercent = vm.usageData.oauthWeeklyAllPercent ?? vm.usageData.weeklyAllPercent
+                if Defaults[.showWeeklyAllUsage], let weeklyAllPercent = weeklyAllPercent {
                     UsageBarView(
                         label: "Weekly (All Models)",
                         percent: weeklyAllPercent,
-                        resetTime: vm.usageData.weeklyAllResetTime,
+                        resetTime: vm.usageData.displayWeeklyAllResetTime,
                         color: vm.usageData.colorForPercent(weeklyAllPercent)
                     )
                 }
 
                 // Weekly Sonnet Usage
-                if Defaults[.showWeeklySonnetUsage], let weeklySonnetPercent = vm.usageData.weeklySonnetPercent {
+                let weeklySonnetPercent = vm.usageData.oauthWeeklySonnetPercent ?? vm.usageData.weeklySonnetPercent
+                if Defaults[.showWeeklySonnetUsage], let weeklySonnetPercent = weeklySonnetPercent {
                     UsageBarView(
                         label: "Weekly (Sonnet)",
                         percent: weeklySonnetPercent,
-                        resetTime: vm.usageData.weeklySonnetResetTime,
+                        resetTime: vm.usageData.displayWeeklySonnetResetTime,
                         color: vm.usageData.colorForPercent(weeklySonnetPercent)
                     )
                 }
@@ -104,6 +111,22 @@ struct ClaudeUsageView: View {
     }
 }
 
+/// Loading state while OAuth data is being fetched
+struct LoadingUsageView: View {
+    var body: some View {
+        VStack(spacing: 8) {
+            ProgressView()
+                .scaleEffect(0.8)
+                .tint(.gray)
+            Text("Loading usage data...")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.gray)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+    }
+}
+
 /// Empty state view when no usage data is available
 struct EmptyUsageView: View {
     var body: some View {
@@ -114,7 +137,7 @@ struct EmptyUsageView: View {
             Text("No usage data yet")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.gray)
-            Text("Use Claude Code or connect the browser extension")
+            Text("Connect via Settings → Claude, or use the browser extension")
                 .font(.system(size: 10))
                 .foregroundColor(.gray.opacity(0.7))
                 .multilineTextAlignment(.center)

@@ -35,7 +35,6 @@ extension Defaults.Keys {
     static let minimumHoverDuration = Key<TimeInterval>("minimumHoverDuration", default: 0.3)
     static let enableHaptics = Key<Bool>("enableHaptics", default: true)
     static let openNotchOnHover = Key<Bool>("openNotchOnHover", default: true)
-    static let extendHoverArea = Key<Bool>("extendHoverArea", default: false)
     static let notchHeightMode = Key<WindowHeightMode>(
         "notchHeightMode",
         default: WindowHeightMode.matchRealNotchSize
@@ -50,26 +49,17 @@ extension Defaults.Keys {
     static let hideFromScreenRecording = Key<Bool>("hideFromScreenRecording", default: false)
 
     // MARK: Appearance
-    static let showEmojis = Key<Bool>("showEmojis", default: false)
     static let showMirror = Key<Bool>("showMirror", default: false)
     static let mirrorShape = Key<MirrorShapeEnum>("mirrorShape", default: MirrorShapeEnum.rectangle)
     static let settingsIconInNotch = Key<Bool>("settingsIconInNotch", default: true)
-    static let lightingEffect = Key<Bool>("lightingEffect", default: true)
     static let enableShadow = Key<Bool>("enableShadow", default: true)
     static let cornerRadiusScaling = Key<Bool>("cornerRadiusScaling", default: true)
     static let showNotHumanFace = Key<Bool>("showNotHumanFace", default: false)
-    static let tileShowLabels = Key<Bool>("tileShowLabels", default: false)
 
     // MARK: Gestures
     static let enableGestures = Key<Bool>("enableGestures", default: true)
     static let closeGestureEnabled = Key<Bool>("closeGestureEnabled", default: true)
     static let gestureSensitivity = Key<CGFloat>("gestureSensitivity", default: 200.0)
-
-    // MARK: Downloads
-    static let enableDownloadListener = Key<Bool>("enableDownloadListener", default: true)
-    static let enableSafariDownloads = Key<Bool>("enableSafariDownloads", default: true)
-    static let selectedDownloadIndicatorStyle = Key<DownloadIndicatorStyle>("selectedDownloadIndicatorStyle", default: DownloadIndicatorStyle.progress)
-    static let selectedDownloadIconStyle = Key<DownloadIconStyle>("selectedDownloadIconStyle", default: DownloadIconStyle.onlyAppIcon)
 
     // MARK: HUD
     static let hudReplacement = Key<Bool>("hudReplacement", default: false)

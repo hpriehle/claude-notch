@@ -73,7 +73,7 @@ class ClaudeViewModel: NSObject, ObservableObject {
             if let data = notification.userInfo?["data"] as? ClaudeUsageData {
                 print("[ClaudeViewModel] RECEIVED: session=\(data.sessionPercent ?? -1)%, weekly=\(data.weeklyAllPercent ?? -1)%")
                 self?.usageData = data
-                self?.isExtensionConnected = data.isConnected
+                self?.isExtensionConnected = data.isConnected || data.isOAuthConnected
             }
         }
     }

@@ -345,16 +345,19 @@ struct WebUsageData: Codable {
     let weeklySonnetResetTime: String
     let accountType: String
 
-    // Parse ISO-8601 dates
-    var sessionResetDate: Date? {
-        return ISO8601DateFormatter().date(from: sessionResetTime)
+    // Parse ISO-8601 dates (strip fractional seconds for reliable parsing)
+    private static func parseDate(_ str: String) -> Date? {
+        guard !str.isEmpty else { return nil }
+        // Strip fractional seconds: "2026-03-13T07:00:01.068410+00:00" → "2026-03-13T07:00:01+00:00"
+        let cleaned = str.replacingOccurrences(of: "\\.\\d+", with: "", options: .regularExpression)
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        if let date = iso.date(from: cleaned) { return date }
+        // Fallback: try original
+        return ISO8601DateFormatter().date(from: str)
     }
 
-    var weeklyAllResetDate: Date? {
-        return ISO8601DateFormatter().date(from: weeklyAllResetTime)
-    }
-
-    var weeklySonnetResetDate: Date? {
-        return ISO8601DateFormatter().date(from: weeklySonnetResetTime)
-    }
+    var sessionResetDate: Date? { Self.parseDate(sessionResetTime) }
+    var weeklyAllResetDate: Date? { Self.parseDate(weeklyAllResetTime) }
+    var weeklySonnetResetDate: Date? { Self.parseDate(weeklySonnetResetTime) }
 }

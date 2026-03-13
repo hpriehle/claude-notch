@@ -37,10 +37,13 @@ struct ClaudeCompactView: View {
                 Text("--")
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundColor(.gray)
-            } else if vm.usageData.hasWebData {
-                // Web data available - show percentages
+            } else if vm.usageData.hasOAuthData || vm.usageData.hasWebData {
+                // API or web data available - show percentages
+                let sessionPercent = vm.usageData.oauthSessionPercent ?? vm.usageData.sessionPercent
+                let weeklyAllPercent = vm.usageData.oauthWeeklyAllPercent ?? vm.usageData.weeklyAllPercent
+
                 // Session percentage
-                if Defaults[.showSessionUsage], let sessionPercent = vm.usageData.sessionPercent {
+                if Defaults[.showSessionUsage], let sessionPercent = sessionPercent {
                     Text("\(sessionPercent)%")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundColor(vm.usageData.colorForPercent(sessionPercent))
@@ -51,7 +54,7 @@ struct ClaudeCompactView: View {
                 }
 
                 // Weekly all-models percentage
-                if Defaults[.showWeeklyAllUsage], let weeklyAllPercent = vm.usageData.weeklyAllPercent {
+                if Defaults[.showWeeklyAllUsage], let weeklyAllPercent = weeklyAllPercent {
                     Text("\(weeklyAllPercent)%")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundColor(vm.usageData.colorForPercent(weeklyAllPercent))
@@ -62,7 +65,7 @@ struct ClaudeCompactView: View {
                 }
 
                 // Reset timer (shows session reset time if available, otherwise weekly)
-                let resetTime = vm.usageData.sessionResetTime ?? vm.usageData.weeklyAllResetTime
+                let resetTime = vm.usageData.displaySessionResetTime ?? vm.usageData.displayWeeklyAllResetTime
                 if resetTime != nil {
                     Text(displayedResetTime)
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -90,7 +93,7 @@ struct ClaudeCompactView: View {
     }
 
     private func updateResetTime() {
-        let resetTime = vm.usageData.sessionResetTime ?? vm.usageData.weeklyAllResetTime
+        let resetTime = vm.usageData.displaySessionResetTime ?? vm.usageData.displayWeeklyAllResetTime
         displayedResetTime = ClaudeUsageData.formatShortResetTime(resetTime)
     }
 }

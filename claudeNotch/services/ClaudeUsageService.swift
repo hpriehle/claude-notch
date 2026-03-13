@@ -80,6 +80,7 @@ class ClaudeUsageService: ObservableObject {
     @Published private(set) var isInitialized: Bool = false
     @Published private(set) var hasCodeData: Bool = false
     @Published private(set) var hasWebData: Bool = false
+    @Published private(set) var hasOAuthData: Bool = false
     @Published private(set) var weeklyPrediction: RateLimitPrediction = .empty
     @Published private(set) var sessionPrediction: RateLimitPrediction = .empty
 
@@ -87,6 +88,7 @@ class ClaudeUsageService: ObservableObject {
 
     private let logMonitor = ClaudeLogMonitor.shared
     private let webSocketServer = WebSocketServer.shared
+    private let oauthFetcher = ClaudeOAuthUsageFetcher.shared
     private let parser = JSONLParser()
     private let calculator = UsageCalculator()
 
@@ -113,6 +115,17 @@ class ClaudeUsageService: ObservableObject {
         // Start WebSocket server
         webSocketServer.start()
 
+        // Start OAuth usage fetching (if credentials available)
+        if oauthFetcher.isConfigured {
+            print("[ClaudeUsageService] OAuth credentials found, starting API polling")
+            hasOAuthData = true  // Show "Connected" in Settings immediately; actual data sets usageData.hasOAuthData
+            oauthFetcher.startAutoRefresh { [weak self] snapshot in
+                self?.handleOAuthUsageData(snapshot)
+            }
+        } else {
+            print("[ClaudeUsageService] No OAuth credentials - will use extension/local data only")
+        }
+
         // Start file monitoring
         logMonitor.startMonitoring { [weak self] in
             self?.refreshCodeUsage()
@@ -128,12 +141,33 @@ class ClaudeUsageService: ObservableObject {
     func stop() {
         logMonitor.stopMonitoring()
         webSocketServer.stop()
+        oauthFetcher.stopAutoRefresh()
         cancellables.removeAll()
         print("[ClaudeUsageService] Stopped")
     }
 
     func refresh() {
         refreshCodeUsage()
+        // Also trigger an OAuth refresh
+        Task {
+            if let snapshot = await oauthFetcher.fetchUsage() {
+                await MainActor.run {
+                    self.handleOAuthUsageData(snapshot)
+                }
+            }
+        }
+    }
+
+    /// Re-check for OAuth credentials and start polling if found.
+    /// Call this after user completes login.
+    func connectOAuth() {
+        ClaudeOAuthCredentialStore.shared.invalidateCache()
+        if oauthFetcher.isConfigured {
+            print("[ClaudeUsageService] OAuth credentials found after connect, starting polling")
+            oauthFetcher.startAutoRefresh { [weak self] snapshot in
+                self?.handleOAuthUsageData(snapshot)
+            }
+        }
     }
 
     // MARK: - Code Usage (from ~/.claude/ logs)
@@ -194,10 +228,17 @@ class ClaudeUsageService: ObservableObject {
         updateUsageData(webUsage: webData)
     }
 
+    // MARK: - OAuth Usage (from Anthropic API)
+
+    private func handleOAuthUsageData(_ snapshot: OAuthUsageSnapshot) {
+        print("[ClaudeUsageService \(ts())] OAUTH RECEIVED: session=\(snapshot.sessionPercent)%, weekly=\(snapshot.weeklyAllPercent)%")
+        updateUsageData(oauthUsage: snapshot)
+    }
+
     // MARK: - Merge and Update
 
-    private func updateUsageData(codeUsage: CalculatedUsage? = nil, webUsage: WebUsageData? = nil) {
-        print("[ClaudeUsageService \(ts())] updateUsageData called - codeUsage: \(codeUsage != nil), webUsage: \(webUsage != nil)")
+    private func updateUsageData(codeUsage: CalculatedUsage? = nil, webUsage: WebUsageData? = nil, oauthUsage: OAuthUsageSnapshot? = nil) {
+        print("[ClaudeUsageService \(ts())] updateUsageData called - codeUsage: \(codeUsage != nil), webUsage: \(webUsage != nil), oauthUsage: \(oauthUsage != nil)")
 
         var updatedUsage = currentUsage
         var hasChanges = false
@@ -238,6 +279,25 @@ class ClaudeUsageService: ObservableObject {
             print("[ClaudeUsageService \(ts())] Web data updated - session=\(web.sessionPercent)%, weekly=\(web.weeklyAllPercent)%")
         }
 
+        // Update OAuth usage fields (real API data - highest priority)
+        if let oauth = oauthUsage {
+            updatedUsage.oauthSessionPercent = oauth.sessionPercent
+            updatedUsage.oauthWeeklyAllPercent = oauth.weeklyAllPercent
+            updatedUsage.oauthWeeklySonnetPercent = oauth.weeklySonnetPercent
+            updatedUsage.oauthWeeklyOpusPercent = oauth.weeklyOpusPercent
+            updatedUsage.oauthSessionResetTime = oauth.sessionResetTime
+            updatedUsage.oauthWeeklyAllResetTime = oauth.weeklyAllResetTime
+            updatedUsage.oauthWeeklySonnetResetTime = oauth.weeklySonnetResetTime
+            updatedUsage.oauthExtraUsageEnabled = oauth.extraUsageEnabled
+            updatedUsage.oauthExtraUsageLimitDollars = oauth.extraUsageLimitDollars
+            updatedUsage.oauthExtraUsageUsedDollars = oauth.extraUsageUsedDollars
+            updatedUsage.oauthExtraUsagePercent = oauth.extraUsagePercent
+            updatedUsage.isOAuthConnected = true
+            hasOAuthData = true
+            hasChanges = true
+            print("[ClaudeUsageService \(ts())] OAuth data updated - session=\(oauth.sessionPercent)%, weekly=\(oauth.weeklyAllPercent)%")
+        }
+
         // Skip posting if nothing changed (prevents stale code-only updates from clobbering fresh web data)
         guard hasChanges else {
             print("[ClaudeUsageService \(ts())] No changes detected, skipping notification")
@@ -266,21 +326,27 @@ class ClaudeUsageService: ObservableObject {
     // MARK: - Predictions
 
     private func updatePredictions(from usage: ClaudeUsageData) {
+        // Prefer OAuth data, fallback to web extension data
+        let weeklyPercent = usage.oauthWeeklyAllPercent ?? usage.weeklyAllPercent
+        let weeklyReset = usage.displayWeeklyAllResetTime
+        let sessionPercent = usage.oauthSessionPercent ?? usage.sessionPercent
+        let sessionReset = usage.displaySessionResetTime
+
         // Update weekly prediction
-        if let percent = usage.weeklyAllPercent {
+        if let percent = weeklyPercent {
             weeklyPrediction = calculatePrediction(
                 percent: percent,
-                resetTime: usage.weeklyAllResetTime
+                resetTime: weeklyReset
             )
         } else {
             weeklyPrediction = .empty
         }
 
         // Update session prediction
-        if let percent = usage.sessionPercent {
+        if let percent = sessionPercent {
             sessionPrediction = calculatePrediction(
                 percent: percent,
-                resetTime: usage.sessionResetTime
+                resetTime: sessionReset
             )
         } else {
             sessionPrediction = .empty
@@ -325,10 +391,12 @@ class ClaudeUsageService: ObservableObject {
     var statusDescription: String {
         var parts: [String] = []
 
-        if hasWebData {
+        if hasOAuthData {
+            parts.append("API: connected")
+        } else if hasWebData {
             parts.append("Web: connected")
         } else {
-            parts.append("Web: not connected")
+            parts.append("API: not connected")
         }
 
         if hasCodeData {

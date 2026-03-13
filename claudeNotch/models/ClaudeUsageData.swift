@@ -23,9 +23,23 @@ struct ClaudeUsageData: Codable, Equatable {
     var codeSonnetTokens: Int?
     var codeOpusTokens: Int?
 
+    // OAuth API usage (from Anthropic OAuth endpoint - real percentages)
+    var oauthSessionPercent: Int?
+    var oauthWeeklyAllPercent: Int?
+    var oauthWeeklySonnetPercent: Int?
+    var oauthWeeklyOpusPercent: Int?
+    var oauthSessionResetTime: Date?
+    var oauthWeeklyAllResetTime: Date?
+    var oauthWeeklySonnetResetTime: Date?
+    var oauthExtraUsageEnabled: Bool?
+    var oauthExtraUsageLimitDollars: Double?
+    var oauthExtraUsageUsedDollars: Double?
+    var oauthExtraUsagePercent: Int?
+
     // Metadata
     var accountType: String?
     var isConnected: Bool
+    var isOAuthConnected: Bool
     var lastUpdated: Date
 
     // MARK: - Empty Initial State
@@ -42,8 +56,20 @@ struct ClaudeUsageData: Codable, Equatable {
             codeTodayTokens: nil,
             codeSonnetTokens: nil,
             codeOpusTokens: nil,
+            oauthSessionPercent: nil,
+            oauthWeeklyAllPercent: nil,
+            oauthWeeklySonnetPercent: nil,
+            oauthWeeklyOpusPercent: nil,
+            oauthSessionResetTime: nil,
+            oauthWeeklyAllResetTime: nil,
+            oauthWeeklySonnetResetTime: nil,
+            oauthExtraUsageEnabled: nil,
+            oauthExtraUsageLimitDollars: nil,
+            oauthExtraUsageUsedDollars: nil,
+            oauthExtraUsagePercent: nil,
             accountType: nil,
             isConnected: false,
+            isOAuthConnected: false,
             lastUpdated: Date()
         )
     }
@@ -54,18 +80,36 @@ struct ClaudeUsageData: Codable, Equatable {
         return sessionPercent != nil || weeklyAllPercent != nil
     }
 
+    var hasOAuthData: Bool {
+        return oauthSessionPercent != nil || oauthWeeklyAllPercent != nil
+    }
+
     var hasCodeData: Bool {
         return codeWeeklyTokens != nil && codeWeeklyTokens! > 0
     }
 
     var hasAnyData: Bool {
-        return hasWebData || hasCodeData
+        return hasWebData || hasOAuthData || hasCodeData
     }
 
-    // Display-friendly percentages (default to 0 if nil)
-    var displaySessionPercent: Int { sessionPercent ?? 0 }
-    var displayWeeklyAllPercent: Int { weeklyAllPercent ?? 0 }
-    var displayWeeklySonnetPercent: Int { weeklySonnetPercent ?? 0 }
+    // Display-friendly percentages - prefer OAuth (real API data) over web extension data
+    var displaySessionPercent: Int { oauthSessionPercent ?? sessionPercent ?? 0 }
+    var displayWeeklyAllPercent: Int { oauthWeeklyAllPercent ?? weeklyAllPercent ?? 0 }
+    var displayWeeklySonnetPercent: Int { oauthWeeklySonnetPercent ?? weeklySonnetPercent ?? 0 }
+    var displayWeeklyOpusPercent: Int { oauthWeeklyOpusPercent ?? 0 }
+
+    // Display-friendly reset times - prefer OAuth over web
+    var displaySessionResetTime: Date? { oauthSessionResetTime ?? sessionResetTime }
+    var displayWeeklyAllResetTime: Date? { oauthWeeklyAllResetTime ?? weeklyAllResetTime }
+    var displayWeeklySonnetResetTime: Date? { oauthWeeklySonnetResetTime ?? weeklySonnetResetTime }
+
+    // Data source indicator
+    var usageDataSource: String {
+        if hasOAuthData { return "API" }
+        if hasWebData { return "Extension" }
+        if hasCodeData { return "Local" }
+        return "None"
+    }
 
     // MARK: - Color Helpers
 

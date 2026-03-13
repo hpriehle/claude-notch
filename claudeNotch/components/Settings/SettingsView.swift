@@ -6,7 +6,6 @@
 //  Modified for ClaudeNotch by Harrison Riehle on 2026. 01. 14..
 //
 
-import AVFoundation
 import Defaults
 import KeyboardShortcuts
 import LaunchAtLogin
@@ -33,18 +32,6 @@ struct SettingsView: View {
                 NavigationLink(value: "Claude") {
                     Label("Claude", systemImage: "sparkles")
                 }
-                NavigationLink(value: "Appearance") {
-                    Label("Appearance", systemImage: "eye")
-                }
-                NavigationLink(value: "HUD") {
-                    Label("HUDs", systemImage: "dial.medium.fill")
-                }
-                NavigationLink(value: "Shortcuts") {
-                    Label("Shortcuts", systemImage: "keyboard")
-                }
-                NavigationLink(value: "Advanced") {
-                    Label("Advanced", systemImage: "gearshape.2")
-                }
                 NavigationLink(value: "About") {
                     Label("About", systemImage: "info.circle")
                 }
@@ -60,14 +47,6 @@ struct SettingsView: View {
                     GeneralSettings()
                 case "Claude":
                     ClaudeSettings()
-                case "Appearance":
-                    Appearance()
-                case "HUD":
-                    HUD()
-                case "Shortcuts":
-                    Shortcuts()
-                case "Advanced":
-                    Advanced()
                 case "About":
                     if let controller = updaterController {
                         About(updaterController: controller)
@@ -112,8 +91,6 @@ struct GeneralSettings: View {
     @EnvironmentObject var vm: ClaudeViewModel
     @ObservedObject var coordinator = ClaudeViewCoordinator.shared
 
-    @Default(.mirrorShape) var mirrorShape
-    @Default(.showEmojis) var showEmojis
     @Default(.gestureSensitivity) var gestureSensitivity
     @Default(.minimumHoverDuration) var minimumHoverDuration
     @Default(.nonNotchHeight) var nonNotchHeight
@@ -124,10 +101,42 @@ struct GeneralSettings: View {
     @Default(.automaticallySwitchDisplay) var automaticallySwitchDisplay
     @Default(.enableGestures) var enableGestures
     @Default(.openNotchOnHover) var openNotchOnHover
-    
+    @Default(.useCustomAccentColor) var useCustomAccentColor
+    @Default(.customAccentColorData) var customAccentColorData
+
+    @State private var customAccentColor: Color = .accentColor
+    @State private var selectedPresetColor: PresetAccentColor? = nil
+
+    // macOS accent colors
+    enum PresetAccentColor: String, CaseIterable, Identifiable {
+        case blue = "Blue"
+        case purple = "Purple"
+        case pink = "Pink"
+        case red = "Red"
+        case orange = "Orange"
+        case yellow = "Yellow"
+        case green = "Green"
+        case graphite = "Graphite"
+
+        var id: String { self.rawValue }
+
+        var color: Color {
+            switch self {
+            case .blue: return Color(red: 0.0, green: 0.478, blue: 1.0)
+            case .purple: return Color(red: 0.686, green: 0.322, blue: 0.871)
+            case .pink: return Color(red: 1.0, green: 0.176, blue: 0.333)
+            case .red: return Color(red: 1.0, green: 0.271, blue: 0.227)
+            case .orange: return Color(red: 1.0, green: 0.584, blue: 0.0)
+            case .yellow: return Color(red: 1.0, green: 0.8, blue: 0.0)
+            case .green: return Color(red: 0.4, green: 0.824, blue: 0.176)
+            case .graphite: return Color(red: 0.557, green: 0.557, blue: 0.576)
+            }
+        }
+    }
 
     var body: some View {
         Form {
+            // MARK: System
             Section {
                 Toggle(isOn: Binding(
                     get: { Defaults[.menubarIcon] },
@@ -156,7 +165,7 @@ struct GeneralSettings: View {
                     }
                 }
                 .disabled(showOnAllDisplays)
-                
+
                 Defaults.Toggle(key: .automaticallySwitchDisplay) {
                     Text("Automatically switch displays")
                 }
@@ -166,9 +175,10 @@ struct GeneralSettings: View {
                     }
                     .disabled(showOnAllDisplays)
             } header: {
-                Text("System features")
+                Text("System")
             }
 
+            // MARK: Notch Sizing
             Section {
                 Picker(
                     selection: $notchHeightMode,
@@ -236,9 +246,50 @@ struct GeneralSettings: View {
                 Text("Notch sizing")
             }
 
+            // MARK: Notch Behavior
             NotchBehaviour()
 
+            // MARK: Gestures
             gestureControls()
+
+            // MARK: Appearance
+            accentColorSection()
+
+            Section {
+                Defaults.Toggle(key: .settingsIconInNotch) {
+                    Text("Show settings icon in notch")
+                }
+                Defaults.Toggle(key: .enableShadow) {
+                    Text("Enable window shadow")
+                }
+                Defaults.Toggle(key: .cornerRadiusScaling) {
+                    Text("Corner radius scaling")
+                }
+            } header: {
+                Text("Window Appearance")
+            }
+
+            // MARK: Window Behavior
+            Section {
+                Defaults.Toggle(key: .hideTitleBar) {
+                    Text("Hide title bar")
+                }
+                Defaults.Toggle(key: .showOnLockScreen) {
+                    Text("Show notch on lock screen")
+                }
+                Defaults.Toggle(key: .hideFromScreenRecording) {
+                    Text("Hide from screen recording")
+                }
+            } header: {
+                Text("Window Behavior")
+            }
+
+            // MARK: Keyboard Shortcuts
+            Section {
+                KeyboardShortcuts.Recorder("Toggle Notch Open:", name: .toggleNotchOpen)
+            } header: {
+                Text("Keyboard Shortcuts")
+            }
         }
         .toolbar {
             Button("Quit app") {
@@ -252,6 +303,10 @@ struct GeneralSettings: View {
             if !openNotchOnHover {
                 enableGestures = true
             }
+        }
+        .onAppear {
+            initializeAccentColorState()
+            loadCustomColor()
         }
     }
 
@@ -322,6 +377,155 @@ struct GeneralSettings: View {
             Text("Notch behavior")
         }
     }
+
+    @ViewBuilder
+    func accentColorSection() -> some View {
+        Section {
+            VStack(alignment: .leading, spacing: 16) {
+                // Toggle between system and custom
+                Picker("Accent color", selection: $useCustomAccentColor) {
+                    Text("System").tag(false)
+                    Text("Custom").tag(true)
+                }
+                .pickerStyle(.segmented)
+
+                if !useCustomAccentColor {
+                    // System accent info
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) {
+                            AccentCircleButton(
+                                isSelected: true,
+                                color: .accentColor,
+                                isSystemDefault: true
+                            ) {}
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Using System Accent")
+                                    .font(.body)
+                                Text("Your macOS system accent color")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                } else {
+                    // Custom color options
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Color Presets")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 12) {
+                            ForEach(PresetAccentColor.allCases) { preset in
+                                AccentCircleButton(
+                                    isSelected: selectedPresetColor == preset,
+                                    color: preset.color,
+                                    isMulticolor: false
+                                ) {
+                                    selectedPresetColor = preset
+                                    customAccentColor = preset.color
+                                    saveCustomColor(preset.color)
+                                    forceUiUpdate()
+                                }
+                            }
+                            Spacer()
+                        }
+
+                        Divider()
+                            .padding(.vertical, 4)
+
+                        // Custom color picker
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Pick a Color")
+                                    .font(.body)
+                                Text("Choose any color")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            ColorPicker(selection: Binding(
+                                get: { customAccentColor },
+                                set: { newColor in
+                                    customAccentColor = newColor
+                                    selectedPresetColor = nil
+                                    saveCustomColor(newColor)
+                                    forceUiUpdate()
+                                }
+                            ), supportsOpacity: false) {
+                                ZStack {
+                                    Circle()
+                                        .fill(customAccentColor)
+                                        .frame(width: 32, height: 32)
+
+                                    if selectedPresetColor == nil {
+                                        Circle()
+                                            .strokeBorder(.primary.opacity(0.3), lineWidth: 2)
+                                            .frame(width: 32, height: 32)
+                                    }
+                                }
+                            }
+                            .labelsHidden()
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        } header: {
+            Text("Accent color")
+        }
+    }
+
+    private func forceUiUpdate() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: Notification.Name("AccentColorChanged"), object: nil)
+        }
+    }
+
+    private func saveCustomColor(_ color: Color) {
+        let nsColor = NSColor(color)
+        if let colorData = try? NSKeyedArchiver.archivedData(withRootObject: nsColor, requiringSecureCoding: false) {
+            Defaults[.customAccentColorData] = colorData
+            forceUiUpdate()
+        }
+    }
+
+    private func loadCustomColor() {
+        if let colorData = Defaults[.customAccentColorData],
+           let nsColor = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSColor.self, from: colorData) {
+            customAccentColor = Color(nsColor: nsColor)
+
+            // Check if loaded color matches a preset
+            selectedPresetColor = nil
+            for preset in PresetAccentColor.allCases {
+                if colorsAreEqual(Color(nsColor: nsColor), preset.color) {
+                    selectedPresetColor = preset
+                    break
+                }
+            }
+        }
+    }
+
+    private func colorsAreEqual(_ color1: Color, _ color2: Color) -> Bool {
+        let nsColor1 = NSColor(color1).usingColorSpace(.sRGB) ?? NSColor(color1)
+        let nsColor2 = NSColor(color2).usingColorSpace(.sRGB) ?? NSColor(color2)
+
+        return abs(nsColor1.redComponent - nsColor2.redComponent) < 0.01 &&
+               abs(nsColor1.greenComponent - nsColor2.greenComponent) < 0.01 &&
+               abs(nsColor1.blueComponent - nsColor2.blueComponent) < 0.01
+    }
+
+    private func initializeAccentColorState() {
+        if !useCustomAccentColor {
+            selectedPresetColor = nil
+        } else {
+            loadCustomColor()
+        }
+    }
 }
 
 // Claude Settings view
@@ -334,16 +538,126 @@ struct ClaudeSettings: View {
     @Default(.usageCriticalThreshold) var usageCriticalThreshold
     @Default(.webSocketPort) var webSocketPort
 
+    @ObservedObject var usageService = ClaudeUsageService.shared
+    @State private var isConnecting = false
+    @State private var connectionError: String?
+
     var body: some View {
         Form {
+            // OAuth API Connection
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(usageService.hasOAuthData ? Color.green : Color.gray.opacity(0.5))
+                                .frame(width: 8, height: 8)
+                            Text(usageService.hasOAuthData ? "Connected via Claude Code" : "Not connected")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+                        if usageService.hasOAuthData {
+                            Text("Usage data refreshes every 120 seconds from Anthropic API")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("Connect your Claude account for real-time usage percentages")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+
+                    if usageService.hasOAuthData {
+                        Button("Refresh") {
+                            usageService.refresh()
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
+                        Button(isConnecting ? "Connecting..." : "Connect") {
+                            connectClaudeAccount()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(isConnecting)
+                    }
+                }
+
+                if let error = connectionError {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+                }
+
+                if !usageService.hasOAuthData {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Setup")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fontWeight(.semibold)
+
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("1.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 16, alignment: .trailing)
+                            Text("Install Claude Code CLI (if not already installed)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("2.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 16, alignment: .trailing)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Run `claude /login` in your terminal")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Button("Copy command") {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString("claude /login", forType: .string)
+                                }
+                                .font(.caption2)
+                                .buttonStyle(.link)
+                            }
+                        }
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("3.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 16, alignment: .trailing)
+                            Text("Click \"Connect\" above after logging in")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+            } header: {
+                HStack {
+                    Text("Claude API Connection")
+                    if usageService.hasOAuthData {
+                        customBadge(text: "Active")
+                    }
+                }
+            } footer: {
+                Text("Reads OAuth tokens from Claude Code CLI to fetch real usage data directly from Anthropic's API. No browser extension needed.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section {
                 Defaults.Toggle(key: .showConnectionStatus) {
                     Text("Show connection status")
                 }
             } header: {
-                Text("Connection")
+                Text("Browser Extension")
             } footer: {
-                Text("Shows whether the browser extension is connected and sending data.")
+                Text("Fallback: shows whether the browser extension is connected and sending data.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -421,211 +735,46 @@ struct ClaudeSettings: View {
         .accentColor(.effectiveAccent)
         .navigationTitle("Claude")
     }
-}
 
-//struct Downloads: View {
-//    @Default(.selectedDownloadIndicatorStyle) var selectedDownloadIndicatorStyle
-//    @Default(.selectedDownloadIconStyle) var selectedDownloadIconStyle
-//    var body: some View {
-//        Form {
-//            warningBadge("We don't support downloads yet", "It will be supported later on.")
-//            Section {
-//                Defaults.Toggle(key: .enableDownloadListener) {
-//                    Text("Show download progress")
-//                }
-//                    .disabled(true)
-//                Defaults.Toggle(key: .enableSafariDownloads) {
-//                    Text("Enable Safari Downloads")
-//                }
-//                    .disabled(!Defaults[.enableDownloadListener])
-//                Picker("Download indicator style", selection: $selectedDownloadIndicatorStyle) {
-//                    Text("Progress bar")
-//                        .tag(DownloadIndicatorStyle.progress)
-//                    Text("Percentage")
-//                        .tag(DownloadIndicatorStyle.percentage)
-//                }
-//                Picker("Download icon style", selection: $selectedDownloadIconStyle) {
-//                    Text("Only app icon")
-//                        .tag(DownloadIconStyle.onlyAppIcon)
-//                    Text("Only download icon")
-//                        .tag(DownloadIconStyle.onlyIcon)
-//                    Text("Both")
-//                        .tag(DownloadIconStyle.iconAndAppIcon)
-//                }
-//
-//            } header: {
-//                HStack {
-//                    Text("Download indicators")
-//                    comingSoonTag()
-//                }
-//            }
-//            Section {
-//                List {
-//                    ForEach([].indices, id: \.self) { index in
-//                        Text("\(index)")
-//                    }
-//                }
-//                .frame(minHeight: 96)
-//                .overlay {
-//                    if true {
-//                        Text("No excluded apps")
-//                            .foregroundStyle(Color(.secondaryLabelColor))
-//                    }
-//                }
-//                .actionBar(padding: 0) {
-//                    Group {
-//                        Button {
-//                        } label: {
-//                            Image(systemName: "plus")
-//                                .frame(width: 25, height: 16, alignment: .center)
-//                                .contentShape(Rectangle())
-//                                .foregroundStyle(.secondary)
-//                        }
-//
-//                        Divider()
-//                        Button {
-//                        } label: {
-//                            Image(systemName: "minus")
-//                                .frame(width: 20, height: 16, alignment: .center)
-//                                .contentShape(Rectangle())
-//                                .foregroundStyle(.secondary)
-//                        }
-//                    }
-//                }
-//            } header: {
-//                HStack(spacing: 4) {
-//                    Text("Exclude apps")
-//                    comingSoonTag()
-//                }
-//            }
-//        }
-//        .navigationTitle("Downloads")
-//    }
-//}
+    private func connectClaudeAccount() {
+        isConnecting = true
+        connectionError = nil
 
-struct HUD: View {
-    @EnvironmentObject var vm: ClaudeViewModel
-    @Default(.inlineHUD) var inlineHUD
-    @Default(.enableGradient) var enableGradient
-    @Default(.hudReplacement) var hudReplacement
-    @ObservedObject var coordinator = ClaudeViewCoordinator.shared
-    @State private var accessibilityAuthorized = false
-    
-    var body: some View {
-        Form {
-            Section {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Replace system HUD")
-                            .font(.headline)
-                        Text("Replaces the standard macOS volume, display brightness, and keyboard brightness HUDs with a custom design.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer(minLength: 40)
-                    Defaults.Toggle("", key: .hudReplacement)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.large)
-                    .disabled(!accessibilityAuthorized)
-                }
-                
-                if !accessibilityAuthorized {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Accessibility access is required to replace the system HUD.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+        // Check if Claude CLI is installed
+        let whichProcess = Process()
+        whichProcess.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        whichProcess.arguments = ["claude"]
+        whichProcess.standardOutput = FileHandle.nullDevice
+        whichProcess.standardError = FileHandle.nullDevice
 
-                        HStack(spacing: 12) {
-                            Button("Request Accessibility") {
-                                XPCHelperClient.shared.requestAccessibilityAuthorization()
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
-                    }
-                    .padding(.top, 6)
-                }
-            }
-            
-            Section {
-                Picker("Progress bar style", selection: $enableGradient) {
-                    Text("Hierarchical")
-                        .tag(false)
-                    Text("Gradient")
-                        .tag(true)
-                }
-                Defaults.Toggle(key: .systemEventIndicatorShadow) {
-                    Text("Enable glowing effect")
-                }
-                Defaults.Toggle(key: .systemEventIndicatorUseAccent) {
-                    Text("Tint progress bar with accent color")
-                }
-            } header: {
-                Text("General")
-            }
-            .disabled(!hudReplacement)
-            
-            Section {
-                Defaults.Toggle(key: .showOpenNotchHUD) {
-                    Text("Show HUD in open notch")
-                }
-                Defaults.Toggle(key: .showOpenNotchHUDPercentage) {
-                    Text("Show percentage")
-                }
-                .disabled(!Defaults[.showOpenNotchHUD])
-            } header: {
-                HStack {
-                    Text("Open Notch")
-                    customBadge(text: "Beta")
-                }
-            }
-            .disabled(!hudReplacement)
-            
-            Section {
-                Picker("HUD style", selection: $inlineHUD) {
-                    Text("Default")
-                        .tag(false)
-                    Text("Inline")
-                        .tag(true)
-                }
-                .onChange(of: Defaults[.inlineHUD]) {
-                    if Defaults[.inlineHUD] {
-                        withAnimation {
-                            Defaults[.systemEventIndicatorShadow] = false
-                            Defaults[.enableGradient] = false
-                        }
-                    }
-                }
-                
-                Defaults.Toggle(key: .showClosedNotchHUDPercentage) {
-                    Text("Show percentage")
-                }
-            } header: {
-                Text("Closed Notch")
-            }
-            .disabled(!Defaults[.hudReplacement])
+        do {
+            try whichProcess.run()
+            whichProcess.waitUntilExit()
+        } catch {
+            isConnecting = false
+            connectionError = "Could not check for Claude CLI"
+            return
         }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("HUDs")
-        .task {
-            accessibilityAuthorized = await XPCHelperClient.shared.isAccessibilityAuthorized()
+
+        if whichProcess.terminationStatus != 0 {
+            isConnecting = false
+            connectionError = "Claude Code CLI not found. Install it first, then run: claude /login"
+            return
         }
-        .onAppear {
-            XPCHelperClient.shared.startMonitoringAccessibilityAuthorization()
-        }
-        .onDisappear {
-            XPCHelperClient.shared.stopMonitoringAccessibilityAuthorization()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .accessibilityAuthorizationChanged)) { notification in
-            if let granted = notification.userInfo?["granted"] as? Bool {
-                accessibilityAuthorized = granted
-            }
+
+        // Invalidate cache and try to read credentials
+        ClaudeOAuthCredentialStore.shared.invalidateCache()
+
+        if ClaudeOAuthCredentialStore.shared.hasCredentials {
+            // Credentials found — start fetching
+            usageService.connectOAuth()
+            isConnecting = false
+        } else {
+            isConnecting = false
+            connectionError = "No OAuth credentials found. Run `claude /login` in your terminal first."
         }
     }
 }
-
-// Removed: Media, CalendarSettings views (features removed in ClaudeNotch)
 
 func lighterColor(from nsColor: NSColor, amount: CGFloat = 0.14) -> Color {
     let srgb = nsColor.usingColorSpace(.sRGB) ?? nsColor
@@ -711,474 +860,9 @@ struct About: View {
             .frame(maxWidth: .infinity, alignment: .center)
         }
         .toolbar {
-            //            Button("Welcome window") {
-            //                openWindow(id: "onboarding")
-            //            }
-            //            .controlSize(.extraLarge)
             CheckForUpdatesView(updater: updaterController.updater)
         }
         .navigationTitle("About")
-    }
-}
-
-// Removed: Shelf view (feature removed in ClaudeNotch)
-
-//struct Extensions: View {
-//    @State private var effectTrigger: Bool = false
-//    var body: some View {
-//        Form {
-//            Section {
-//                List {
-//                    ForEach(extensionManager.installedExtensions.indices, id: \.self) { index in
-//                        let item = extensionManager.installedExtensions[index]
-//                        HStack {
-//                            AppIcon(for: item.bundleIdentifier)
-//                                .resizable()
-//                                .frame(width: 24, height: 24)
-//                            Text(item.name)
-//                            ListItemPopover {
-//                                Text("Description")
-//                            }
-//                            Spacer(minLength: 0)
-//                            HStack(spacing: 6) {
-//                                Circle()
-//                                    .frame(width: 6, height: 6)
-//                                    .foregroundColor(
-//                                        isExtensionRunning(item.bundleIdentifier)
-//                                            ? .green : item.status == .disabled ? .gray : .red
-//                                    )
-//                                    .conditionalModifier(isExtensionRunning(item.bundleIdentifier))
-//                                { view in
-//                                    view
-//                                        .shadow(color: .green, radius: 3)
-//                                }
-//                                Text(
-//                                    isExtensionRunning(item.bundleIdentifier)
-//                                        ? "Running"
-//                                        : item.status == .disabled ? "Disabled" : "Stopped"
-//                                )
-//                                .contentTransition(.numericText())
-//                                .foregroundStyle(.secondary)
-//                                .font(.footnote)
-//                            }
-//                            .frame(width: 60, alignment: .leading)
-//
-//                            Menu(
-//                                content: {
-//                                    Button("Restart") {
-//                                        let ws = NSWorkspace.shared
-//
-//                                        if let ext = ws.runningApplications.first(where: {
-//                                            $0.bundleIdentifier == item.bundleIdentifier
-//                                        }) {
-//                                            ext.terminate()
-//                                        }
-//
-//                                        if let appURL = ws.urlForApplication(
-//                                            withBundleIdentifier: item.bundleIdentifier)
-//                                        {
-//                                            ws.openApplication(
-//                                                at: appURL, configuration: .init(),
-//                                                completionHandler: nil)
-//                                        }
-//                                    }
-//                                    .keyboardShortcut("R", modifiers: .command)
-//                                    Button("Disable") {
-//                                        if let ext = NSWorkspace.shared.runningApplications.first(
-//                                            where: { $0.bundleIdentifier == item.bundleIdentifier })
-//                                        {
-//                                            ext.terminate()
-//                                        }
-//                                        extensionManager.installedExtensions[index].status =
-//                                            .disabled
-//                                    }
-//                                    .keyboardShortcut("D", modifiers: .command)
-//                                    Divider()
-//                                    Button("Uninstall", role: .destructive) {
-//                                        //
-//                                    }
-//                                },
-//                                label: {
-//                                    Image(systemName: "ellipsis.circle")
-//                                        .foregroundStyle(.secondary)
-//                                }
-//                            )
-//                            .controlSize(.regular)
-//                        }
-//                        .buttonStyle(PlainButtonStyle())
-//                        .padding(.vertical, 5)
-//                    }
-//                }
-//                .frame(minHeight: 120)
-//                .actionBar {
-//                    Button {
-//                    } label: {
-//                        HStack(spacing: 3) {
-//                            Image(systemName: "plus")
-//                            Text("Add manually")
-//                        }
-//                        .foregroundStyle(.secondary)
-//                    }
-//                    .disabled(true)
-//                    Spacer()
-//                    Button {
-//                        withAnimation(.linear(duration: 1)) {
-//                            effectTrigger.toggle()
-//                        } completion: {
-//                            effectTrigger.toggle()
-//                        }
-//                        extensionManager.checkIfExtensionsAreInstalled()
-//                    } label: {
-//                        HStack(spacing: 3) {
-//                            Image(systemName: "arrow.triangle.2.circlepath")
-//                                .rotationEffect(effectTrigger ? .degrees(360) : .zero)
-//                        }
-//                        .foregroundStyle(.secondary)
-//                    }
-//                }
-//                .controlSize(.small)
-//                .buttonStyle(PlainButtonStyle())
-//                .overlay {
-//                    if extensionManager.installedExtensions.isEmpty {
-//                        Text("No extension installed")
-//                            .foregroundStyle(Color(.secondaryLabelColor))
-//                            .padding(.bottom, 22)
-//                    }
-//                }
-//            } header: {
-//                HStack(spacing: 0) {
-//                    Text("Installed extensions")
-//                    if !extensionManager.installedExtensions.isEmpty {
-//                        Text(" – \(extensionManager.installedExtensions.count)")
-//                            .foregroundStyle(.secondary)
-//                    }
-//                }
-//            }
-//        }
-//        .accentColor(.effectiveAccent)
-//        .navigationTitle("Extensions")
-//        // TipsView()
-//        // .padding(.horizontal, 19)
-//    }
-//}
-
-struct Appearance: View {
-    @Default(.mirrorShape) var mirrorShape
-
-    var body: some View {
-        Form {
-            Section {
-                Defaults.Toggle(key: .settingsIconInNotch) {
-                    Text("Show settings icon in notch")
-                }
-            } header: {
-                Text("General")
-            }
-
-            Section {
-                Defaults.Toggle(key: .showMirror) {
-                    Text("Enable mirror")
-                }
-                    .disabled(!checkVideoInput())
-                Picker("Mirror shape", selection: $mirrorShape) {
-                    Text("Circle")
-                        .tag(MirrorShapeEnum.circle)
-                    Text("Square")
-                        .tag(MirrorShapeEnum.rectangle)
-                }
-                Defaults.Toggle(key: .showNotHumanFace) {
-                    Text("Show face animation while inactive")
-                }
-            } header: {
-                Text("Additional features")
-            }
-        }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Appearance")
-    }
-
-    func checkVideoInput() -> Bool {
-        if AVCaptureDevice.default(for: .video) != nil {
-            return true
-        }
-
-        return false
-    }
-}
-
-struct Advanced: View {
-    @Default(.useCustomAccentColor) var useCustomAccentColor
-    @Default(.customAccentColorData) var customAccentColorData
-    @Default(.extendHoverArea) var extendHoverArea
-    @Default(.showOnLockScreen) var showOnLockScreen
-    @Default(.hideFromScreenRecording) var hideFromScreenRecording
-    
-    @State private var customAccentColor: Color = .accentColor
-    @State private var selectedPresetColor: PresetAccentColor? = nil
-    let icons: [String] = ["logo2"]
-    @State private var selectedIcon: String = "logo2"
-    
-    // macOS accent colors
-    enum PresetAccentColor: String, CaseIterable, Identifiable {
-        case blue = "Blue"
-        case purple = "Purple"
-        case pink = "Pink"
-        case red = "Red"
-        case orange = "Orange"
-        case yellow = "Yellow"
-        case green = "Green"
-        case graphite = "Graphite"
-        
-        var id: String { self.rawValue }
-        
-        var color: Color {
-            switch self {
-            case .blue: return Color(red: 0.0, green: 0.478, blue: 1.0)
-            case .purple: return Color(red: 0.686, green: 0.322, blue: 0.871)
-            case .pink: return Color(red: 1.0, green: 0.176, blue: 0.333)
-            case .red: return Color(red: 1.0, green: 0.271, blue: 0.227)
-            case .orange: return Color(red: 1.0, green: 0.584, blue: 0.0)
-            case .yellow: return Color(red: 1.0, green: 0.8, blue: 0.0)
-            case .green: return Color(red: 0.4, green: 0.824, blue: 0.176)
-            case .graphite: return Color(red: 0.557, green: 0.557, blue: 0.576)
-            }
-        }
-    }
-    
-    var body: some View {
-        Form {
-            Section {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Toggle between system and custom
-                    Picker("Accent color", selection: $useCustomAccentColor) {
-                        Text("System").tag(false)
-                        Text("Custom").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    
-                    if !useCustomAccentColor {
-                        // System accent info
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 12) {
-                                AccentCircleButton(
-                                    isSelected: true,
-                                    color: .accentColor,
-                                    isSystemDefault: true
-                                ) {}
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Using System Accent")
-                                        .font(.body)
-                                    Text("Your macOS system accent color")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                            }
-                        }
-                    } else {
-                        // Custom color options
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Color Presets")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.secondary)
-                            
-                            HStack(spacing: 12) {
-                                ForEach(PresetAccentColor.allCases) { preset in
-                                    AccentCircleButton(
-                                        isSelected: selectedPresetColor == preset,
-                                        color: preset.color,
-                                        isMulticolor: false
-                                    ) {
-                                        selectedPresetColor = preset
-                                        customAccentColor = preset.color
-                                        saveCustomColor(preset.color)
-                                        forceUiUpdate()
-                                    }
-                                }
-                                Spacer()
-                            }
-                            
-                            Divider()
-                                .padding(.vertical, 4)
-                            
-                            // Custom color picker
-                            HStack(spacing: 12) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Pick a Color")
-                                        .font(.body)
-                                    Text("Choose any color")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                
-                                Spacer()
-                                
-                                ColorPicker(selection: Binding(
-                                    get: { customAccentColor },
-                                    set: { newColor in
-                                        customAccentColor = newColor
-                                        selectedPresetColor = nil
-                                        saveCustomColor(newColor)
-                                        forceUiUpdate()
-                                    }
-                                ), supportsOpacity: false) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(customAccentColor)
-                                            .frame(width: 32, height: 32)
-                                        
-                                        if selectedPresetColor == nil {
-                                            Circle()
-                                                .strokeBorder(.primary.opacity(0.3), lineWidth: 2)
-                                                .frame(width: 32, height: 32)
-                                        }
-                                    }
-                                }
-                                .labelsHidden()
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical, 4)
-            } header: {
-                Text("Accent color")
-            } footer: {
-                Text("Choose between your system accent color or customize it with your own selection.")
-                    .multilineTextAlignment(.trailing)
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
-            .onAppear {
-                initializeAccentColorState()
-            }
-            
-            Section {
-                Defaults.Toggle(key: .enableShadow) {
-                    Text("Enable window shadow")
-                }
-                Defaults.Toggle(key: .cornerRadiusScaling) {
-                    Text("Corner radius scaling")
-                }
-            } header: {
-                Text("Window Appearance")
-            }
-            
-            Section {
-                HStack {
-                    ForEach(icons, id: \.self) { icon in
-                        Spacer()
-                        VStack {
-                            Image(icon)
-                                .resizable()
-                                .frame(width: 80, height: 80)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 20, style: .circular)
-                                        .strokeBorder(
-                                            icon == selectedIcon ? Color.effectiveAccent : .clear,
-                                            lineWidth: 2.5
-                                        )
-                                )
-
-                            Text("Default")
-                                .fontWeight(.medium)
-                                .font(.caption)
-                                .foregroundStyle(icon == selectedIcon ? .white : .secondary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 3)
-                                .background(
-                                    Capsule()
-                                        .fill(icon == selectedIcon ? Color.effectiveAccent : .clear)
-                                )
-                        }
-                        .onTapGesture {
-                            withAnimation {
-                                selectedIcon = icon
-                            }
-                            NSApp.applicationIconImage = NSImage(named: icon)
-                        }
-                        Spacer()
-                    }
-                }
-                .disabled(true)
-            } header: {
-                HStack {
-                    Text("App icon")
-                    customBadge(text: "Coming soon")
-                }
-            }
-            
-            Section {
-                Defaults.Toggle(key: .extendHoverArea) {
-                    Text("Extend hover area")
-                }
-                Defaults.Toggle(key: .hideTitleBar) {
-                    Text("Hide title bar")
-                }
-                Defaults.Toggle(key: .showOnLockScreen) {
-                    Text("Show notch on lock screen")
-                }
-                Defaults.Toggle(key: .hideFromScreenRecording) {
-                    Text("Hide from screen recording")
-                }
-            } header: {
-                Text("Window Behavior")
-            }
-        }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Advanced")
-        .onAppear {
-            loadCustomColor()
-        }
-    }
-    
-    private func forceUiUpdate() {
-        // Force refresh the UI
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(name: Notification.Name("AccentColorChanged"), object: nil)
-        }
-    }
-    
-    private func saveCustomColor(_ color: Color) {
-        let nsColor = NSColor(color)
-        if let colorData = try? NSKeyedArchiver.archivedData(withRootObject: nsColor, requiringSecureCoding: false) {
-            Defaults[.customAccentColorData] = colorData
-            forceUiUpdate()
-        }
-    }
-    
-    private func loadCustomColor() {
-        if let colorData = Defaults[.customAccentColorData],
-           let nsColor = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSColor.self, from: colorData) {
-            customAccentColor = Color(nsColor: nsColor)
-            
-            // Check if loaded color matches a preset
-            selectedPresetColor = nil
-            for preset in PresetAccentColor.allCases {
-                if colorsAreEqual(Color(nsColor: nsColor), preset.color) {
-                    selectedPresetColor = preset
-                    break
-                }
-            }
-        }
-    }
-    
-    private func colorsAreEqual(_ color1: Color, _ color2: Color) -> Bool {
-        let nsColor1 = NSColor(color1).usingColorSpace(.sRGB) ?? NSColor(color1)
-        let nsColor2 = NSColor(color2).usingColorSpace(.sRGB) ?? NSColor(color2)
-        
-        return abs(nsColor1.redComponent - nsColor2.redComponent) < 0.01 &&
-               abs(nsColor1.greenComponent - nsColor2.greenComponent) < 0.01 &&
-               abs(nsColor1.blueComponent - nsColor2.blueComponent) < 0.01
-    }
-    
-    private func initializeAccentColorState() {
-        if !useCustomAccentColor {
-            selectedPresetColor = nil // Multicolor is selected when useCustomAccentColor is false
-        } else {
-            loadCustomColor()
-        }
     }
 }
 
@@ -1189,7 +873,7 @@ struct AccentCircleButton: View {
     var isSystemDefault: Bool = false
     var isMulticolor: Bool = false
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             ZStack {
@@ -1197,12 +881,12 @@ struct AccentCircleButton: View {
                 Circle()
                     .fill(color)
                     .frame(width: 32, height: 32)
-                
+
                 // Subtle border
                 Circle()
                     .strokeBorder(Color.primary.opacity(0.15), lineWidth: 1)
                     .frame(width: 32, height: 32)
-                
+
                 // Apple-style highlight ring around the middle when selected
                 if isSelected {
                     Circle()
@@ -1219,29 +903,7 @@ struct AccentCircleButton: View {
     }
 }
 
-struct Shortcuts: View {
-    var body: some View {
-        Form {
-            Section {
-                KeyboardShortcuts.Recorder("Toggle Sneak Peek:", name: .toggleSneakPeek)
-            } header: {
-                Text("Media")
-            } footer: {
-                Text(
-                    "Sneak Peek shows the media title and artist under the notch for a few seconds."
-                )
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(.secondary)
-                .font(.caption)
-            }
-            Section {
-                KeyboardShortcuts.Recorder("Toggle Notch Open:", name: .toggleNotchOpen)
-            }
-        }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Shortcuts")
-    }
-}
+// MARK: - Utility Views
 
 func proFeatureBadge() -> some View {
     Text("Upgrade to Pro")
@@ -1289,8 +951,4 @@ func warningBadge(_ text: String, _ description: String) -> some View {
             Spacer()
         }
     }
-}
-
-#Preview {
-    HUD()
 }
