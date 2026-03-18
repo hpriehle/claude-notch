@@ -83,22 +83,32 @@ final class DailyTokenCache {
                 existing = DailyTokenCacheFile(cachedAt: cutoff, daily: [:], finalizedDates: [])
             }
 
-            let cutoff = existing.cachedAt
             let newNow = Date()
             let todayKey = dateFormatter.string(from: newNow)
             let finalizedDates = existing.finalizedDates
 
-            let newTokens = parseNewFiles(since: cutoff, in: projectsDir)
+            // For today: always re-parse from start of day so we get the full total.
+            // For past days: only parse files modified since last cache write.
+            let todayCutoff = Calendar.current.startOfDay(for: newNow)
+            let historyCutoff = existing.cachedAt
 
-            // Merge: today always replaces (files still being written);
+            let todayTokens = parseNewFiles(since: todayCutoff, in: projectsDir, onlyDate: todayKey)
+            let historyTokens = parseNewFiles(since: historyCutoff, in: projectsDir, excludeDate: todayKey)
+
+            // Merge: today is fully re-counted from all of today's files;
             // past days only fill in if missing; finalized dates are never overwritten.
             var merged = existing.daily
-            for (date, tokens) in newTokens {
+
+            // Today: full recount from start of day
+            if let todayTotal = todayTokens[todayKey], todayTotal > 0 {
+                merged[todayKey] = todayTotal
+            }
+
+            // History: fill in any missing past days
+            for (date, tokens) in historyTokens {
                 guard !finalizedDates.contains(date) else { continue }
-                if date == todayKey {
-                    merged[date] = tokens        // replace today
-                } else if merged[date] == nil {
-                    merged[date] = tokens        // fill in missing past days
+                if merged[date] == nil {
+                    merged[date] = tokens
                 }
             }
 
@@ -121,7 +131,7 @@ final class DailyTokenCache {
         }
     }
 
-    private func parseNewFiles(since cutoff: Date, in projectsDir: URL) -> [String: Int] {
+    private func parseNewFiles(since cutoff: Date, in projectsDir: URL, onlyDate: String? = nil, excludeDate: String? = nil) -> [String: Int] {
         var daily: [String: Int] = [:]
         let fileManager = FileManager.default
 
@@ -153,6 +163,8 @@ final class DailyTokenCache {
                       let tokens = entry.message?.usage?.output_tokens,
                       tokens > 0 else { continue }
                 let key = dateFormatter.string(from: date)
+                if let only = onlyDate, key != only { continue }
+                if let exclude = excludeDate, key == exclude { continue }
                 daily[key, default: 0] += tokens
             }
         }
