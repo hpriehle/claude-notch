@@ -212,13 +212,16 @@ class ClaudeOAuthUsageFetcher {
 
     // MARK: - Auto-refresh
 
-    func startAutoRefresh(onUpdate: @escaping (OAuthUsageSnapshot) -> Void) {
+    func startAutoRefresh(onUpdate: @escaping (OAuthUsageSnapshot) -> Void,
+                          onInitialFetchComplete: (() -> Void)? = nil) {
         stopAutoRefresh()
 
-        // Initial fetch
+        // Initial fetch — always calls onInitialFetchComplete so callers can exit loading state
         Task {
-            if let snapshot = await fetchUsage() {
-                await MainActor.run { onUpdate(snapshot) }
+            let snapshot = await fetchUsage()
+            await MainActor.run {
+                if let snapshot = snapshot { onUpdate(snapshot) }
+                onInitialFetchComplete?()
             }
         }
 
@@ -277,12 +280,9 @@ class ClaudeOAuthUsageFetcher {
     }
 
     /// Normalizes a utilization value to integer percentage (0–100).
-    /// The API returns some windows as fractions (0–1) and others as percentages (0–100).
+    /// The API returns utilization as percentages (0–100).
     private func normalizeUtilization(_ value: Double) -> Int {
-        if value > 0 && value <= 1.0 {
-            return Int((value * 100).rounded())
-        }
-        return Int(value.rounded())
+        return min(100, max(0, Int(value.rounded())))
     }
 
     private func parseResponse(_ data: Data) -> OAuthUsageSnapshot? {

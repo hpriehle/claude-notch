@@ -88,13 +88,13 @@ struct ClaudeUsageView: View {
 
                 ConnectionStatusView(
                     isConnected: vm.usageData.isOAuthConnected,
-                    isLoading: usageService.hasOAuthData && !usageService.hasCompletedInitialFetch
+                    isLoading: usageService.isInitialFetchInProgress
                 )
             }
             .padding(.bottom, 4)
 
-            // Show loading while waiting for first API response, or empty if not configured
-            if usageService.hasOAuthData && !usageService.hasCompletedInitialFetch {
+            // Show loading only while the initial API call is in flight
+            if usageService.isInitialFetchInProgress {
                 LoadingUsageView()
             } else if !vm.usageData.hasAnyData {
                 EmptyUsageView()

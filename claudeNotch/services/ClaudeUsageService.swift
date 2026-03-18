@@ -84,16 +84,7 @@ class ClaudeUsageService: ObservableObject {
     @Published private(set) var sessionPrediction: RateLimitPrediction = .empty
     @Published private(set) var isRefreshing: Bool = false
     @Published private(set) var lastRefreshError: String? = nil
-    @Published private(set) var hasCompletedInitialFetch: Bool = false
-
-    // MARK: - Private Properties
-
-    /// Tracks how many OAuth responses we've received. If the first response(s) return
-    /// all-zero utilization (e.g. during an Anthropic incident), we keep the loading state
-    /// rather than showing 0% bars. After this many attempts we accept the data as real
-    /// (covers users who genuinely have 0% usage).
-    private var initialFetchAttempts = 0
-    private let maxInitialFetchAttemptsBeforeAccepting = 2
+    @Published private(set) var isInitialFetchInProgress: Bool = false
 
     private let logMonitor = ClaudeLogMonitor.shared
     private let oauthFetcher = ClaudeOAuthUsageFetcher.shared
@@ -119,10 +110,22 @@ class ClaudeUsageService: ObservableObject {
         // Start OAuth usage fetching (if credentials available)
         if oauthFetcher.isConfigured {
             print("[ClaudeUsageService] OAuth credentials found, starting API polling")
-            hasOAuthData = true  // Show "Connected" in Settings immediately; actual data sets usageData.hasOAuthData
-            oauthFetcher.startAutoRefresh { [weak self] snapshot in
-                self?.handleOAuthUsageData(snapshot)
-            }
+            hasOAuthData = true
+            isInitialFetchInProgress = true
+            oauthFetcher.startAutoRefresh(
+                onUpdate: { [weak self] snapshot in
+                    self?.handleOAuthUsageData(snapshot)
+                },
+                onInitialFetchComplete: { [weak self] in
+                    guard let self = self else { return }
+                    self.isInitialFetchInProgress = false
+                    // If we never got data, credentials were bad — show disconnected, not loading
+                    if !self.currentUsage.hasOAuthData {
+                        self.hasOAuthData = false
+                        print("[ClaudeUsageService] Initial fetch failed — marking as disconnected")
+                    }
+                }
+            )
         } else {
             print("[ClaudeUsageService] No OAuth credentials - will use extension/local data only")
         }
@@ -279,22 +282,6 @@ class ClaudeUsageService: ObservableObject {
 
     private func handleOAuthUsageData(_ snapshot: OAuthUsageSnapshot) {
         print("[ClaudeUsageService \(ts())] OAUTH RECEIVED: session=\(snapshot.sessionPercent)%, weekly=\(snapshot.weeklyAllPercent)%")
-
-        if !hasCompletedInitialFetch {
-            initialFetchAttempts += 1
-            let hasNonZeroData = snapshot.sessionPercent > 0
-                || snapshot.weeklyAllPercent > 0
-                || (snapshot.weeklySonnetPercent ?? 0) > 0
-                || (snapshot.weeklyOpusPercent ?? 0) > 0
-
-            if hasNonZeroData || initialFetchAttempts >= maxInitialFetchAttemptsBeforeAccepting {
-                hasCompletedInitialFetch = true
-                print("[ClaudeUsageService \(ts())] Initial fetch complete (attempt \(initialFetchAttempts), hasNonZero=\(hasNonZeroData))")
-            } else {
-                print("[ClaudeUsageService \(ts())] All-zero response, keeping loading state (attempt \(initialFetchAttempts)/\(maxInitialFetchAttemptsBeforeAccepting))")
-            }
-        }
-
         updateUsageData(oauthUsage: snapshot)
     }
 

@@ -151,7 +151,7 @@ struct ContentView: View {
                 // Session progress bar below notch (visible in closed state)
                 // Hide during initial load to avoid showing 0% before real data arrives
                 let effectiveSessionPercent = vm.usageData.oauthSessionPercent
-                if vm.notchState == .closed, usageService.hasCompletedInitialFetch, let sessionPercent = effectiveSessionPercent {
+                if vm.notchState == .closed, !usageService.isInitialFetchInProgress, let sessionPercent = effectiveSessionPercent {
                     SessionBarView(percent: sessionPercent, color: vm.usageData.colorForPercent(sessionPercent))
                         .frame(width: vm.closedNotchSize.width)
                         .padding(.top, 2)
