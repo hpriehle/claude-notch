@@ -4,9 +4,12 @@ Track your Claude API usage right from your MacBook's notch.
 
 ClaudeNotch lives in your MacBook's notch and shows real-time Claude usage stats at a glance. Hover to expand and see detailed breakdowns, swipe for usage history, and get notified when you're approaching limits.
 
-<!-- TODO: Add screenshot/GIF here -->
+
+https://github.com/user-attachments/assets/4183afbe-8bb9-474a-8f8e-a541fd505d94
+
 
 ## Features
+
 
 - **Live usage in the notch** — token count and reset countdown visible at all times
 - **Expanded detail view** — hover to see per-model cost breakdown, daily/monthly spend
@@ -15,6 +18,7 @@ ClaudeNotch lives in your MacBook's notch and shows real-time Claude usage stats
 - **OAuth login** — connect your Anthropic account directly
 - **Usage notifications** — alerts when approaching spend limits
 - **Launch at login** — always running in the background
+- **Now with Extra Usage**- see the current Claude Extra Usage Promotion
 
 ## Installation
 
