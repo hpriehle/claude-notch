@@ -5,7 +5,9 @@ Track your Claude API usage right from your MacBook's notch.
 ClaudeNotch lives in your MacBook's notch and shows real-time Claude usage stats at a glance. Hover to expand and see detailed breakdowns, swipe for usage history, and get notified when you're approaching limits.
 
 
-https://github.com/user-attachments/assets/4183afbe-8bb9-474a-8f8e-a541fd505d94
+
+https://github.com/user-attachments/assets/cff88d74-8aeb-45f4-b82e-4e3fe1fd5f63
+
 
 
 ## Features
