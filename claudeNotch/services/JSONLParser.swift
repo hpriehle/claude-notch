@@ -144,6 +144,15 @@ struct HistoryEntry: Codable {
     let sessionId: String?
 }
 
+// MARK: - Session Breakdown
+
+struct SessionBreakdown {
+    let quickCount: Int    // < 5 assistant messages
+    let focusedCount: Int  // 5–20 assistant messages
+    let deepCount: Int     // > 20 assistant messages
+    var total: Int { quickCount + focusedCount + deepCount }
+}
+
 // MARK: - Parsed Usage Data
 
 struct ParsedCodeUsage {
@@ -383,6 +392,56 @@ class JSONLParser {
         usage.lastUpdated = Date()
 
         return usage
+    }
+
+    // MARK: - Live Stats from JSONL (more current than stats-cache)
+
+    func liveStatsFromEntries(_ entries: [ClaudeLogEntry]) -> (sessions: Int, messages: Int) {
+        var sessionIds = Set<String>()
+        var messages = 0
+        for entry in entries where entry.type == "assistant" {
+            messages += 1
+            if let sid = entry.sessionId { sessionIds.insert(sid) }
+        }
+        return (sessions: sessionIds.count, messages: messages)
+    }
+
+    // MARK: - Daily Output Tokens from JSONL (fills stats-cache gaps)
+
+    func dailyOutputTokensFromEntries(_ entries: [ClaudeLogEntry]) -> [String: Int] {
+        var daily: [String: Int] = [:]
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        for entry in entries where entry.type == "assistant" {
+            guard let ts = entry.timestamp,
+                  let date = iso.date(from: ts),
+                  let outputTokens = entry.message?.usage?.output_tokens,
+                  outputTokens > 0 else { continue }
+            let key = fmt.string(from: date)
+            daily[key, default: 0] += outputTokens
+        }
+        return daily
+    }
+
+    // MARK: - Session Classification
+
+    func classifySessionsFromLogs(_ entries: [ClaudeLogEntry]) -> SessionBreakdown {
+        var sessionMsgCounts: [String: Int] = [:]
+        for entry in entries where entry.type == "assistant" {
+            if let sid = entry.sessionId {
+                sessionMsgCounts[sid, default: 0] += 1
+            }
+        }
+        var quick = 0, focused = 0, deep = 0
+        for count in sessionMsgCounts.values {
+            if count < 5        { quick += 1 }
+            else if count <= 20 { focused += 1 }
+            else                { deep += 1 }
+        }
+        return SessionBreakdown(quickCount: quick, focusedCount: focused, deepCount: deep)
     }
 
     // MARK: - Check if Claude Directory Exists

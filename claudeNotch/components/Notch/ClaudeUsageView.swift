@@ -12,6 +12,7 @@ import AppKit
 /// Expanded view showing full Claude usage statistics, with a second history page.
 struct ClaudeUsageView: View {
     @EnvironmentObject var vm: ClaudeViewModel
+    @ObservedObject private var usageService = ClaudeUsageService.shared
 
     // Set to false to disable the history page entirely (safe kill switch)
     private static let historyPageEnabled = true
@@ -73,33 +74,33 @@ struct ClaudeUsageView: View {
 
                 // Refresh button
                 Button(action: {
-                    WebSocketServer.shared.requestRefresh()
+                    usageService.refresh()
                 }) {
                     Image(systemName: "arrow.clockwise")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(usageService.isRefreshing ? .white : .gray)
+                        .rotationEffect(.degrees(usageService.isRefreshing ? 360 : 0))
+                        .animation(usageService.isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: usageService.isRefreshing)
                 }
                 .buttonStyle(.plain)
+                .disabled(usageService.isRefreshing)
                 .help("Refresh usage data")
 
                 ConnectionStatusView(
-                    isConnected: vm.isExtensionConnected,
-                    hasWebData: vm.usageData.hasWebData,
-                    lastUpdated: vm.usageData.lastUpdated
+                    isConnected: vm.usageData.isOAuthConnected,
+                    isLoading: usageService.hasOAuthData && !usageService.hasCompletedInitialFetch
                 )
             }
             .padding(.bottom, 4)
 
-            // Show empty state or loading state if no data
-            if !vm.usageData.hasAnyData {
-                if ClaudeUsageService.shared.hasOAuthData {
-                    LoadingUsageView()
-                } else {
-                    EmptyUsageView()
-                }
+            // Show loading while waiting for first API response, or empty if not configured
+            if usageService.hasOAuthData && !usageService.hasCompletedInitialFetch {
+                LoadingUsageView()
+            } else if !vm.usageData.hasAnyData {
+                EmptyUsageView()
             } else {
-                // Session Usage (prefer OAuth, fallback to web extension)
-                let sessionPercent = vm.usageData.oauthSessionPercent ?? vm.usageData.sessionPercent
+                // Session Usage
+                let sessionPercent = vm.usageData.oauthSessionPercent
                 if Defaults[.showSessionUsage], let sessionPercent = sessionPercent {
                     UsageBarView(
                         label: "Session",
@@ -110,7 +111,7 @@ struct ClaudeUsageView: View {
                 }
 
                 // Weekly All Models Usage
-                let weeklyAllPercent = vm.usageData.oauthWeeklyAllPercent ?? vm.usageData.weeklyAllPercent
+                let weeklyAllPercent = vm.usageData.oauthWeeklyAllPercent
                 if Defaults[.showWeeklyAllUsage], let weeklyAllPercent = weeklyAllPercent {
                     UsageBarView(
                         label: "Weekly (All Models)",
@@ -120,8 +121,9 @@ struct ClaudeUsageView: View {
                     )
                 }
 
-                // Weekly Sonnet Usage
-                let weeklySonnetPercent = vm.usageData.oauthWeeklySonnetPercent ?? vm.usageData.weeklySonnetPercent
+                // Weekly Sonnet Usage (default to 0% when OAuth is connected but no Sonnet-specific value available)
+                let weeklySonnetPercent = vm.usageData.oauthWeeklySonnetPercent
+                    ?? (vm.usageData.hasOAuthData ? 0 : nil)
                 if Defaults[.showWeeklySonnetUsage], let weeklySonnetPercent = weeklySonnetPercent {
                     UsageBarView(
                         label: "Weekly (Sonnet)",
@@ -131,21 +133,7 @@ struct ClaudeUsageView: View {
                     )
                 }
 
-                // Account type footer
-                if let accountType = vm.usageData.accountType {
-                    HStack {
-                        Text(accountType)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.gray)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(Color.white.opacity(0.1))
-                            .cornerRadius(4)
-                        Spacer()
-                    }
-                }
-
-                // Show code stats when available (fallback when no web data)
+                // Show code stats when available
                 if vm.usageData.hasCodeData {
                     CodeUsageView(usageData: vm.usageData)
                 }
@@ -331,11 +319,24 @@ struct UsageBarView: View {
 /// Connection status view with multiple states
 struct ConnectionStatusView: View {
     let isConnected: Bool
-    let hasWebData: Bool
-    let lastUpdated: Date?
+    var isLoading: Bool = false
 
     var body: some View {
-        if isConnected {
+        if isLoading {
+            // Loading initial data from API
+            HStack(spacing: 4) {
+                ProgressView()
+                    .scaleEffect(0.5)
+                    .tint(.gray)
+                Text("Loading…")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(.gray)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(8)
+        } else if isConnected {
             // Connected and receiving live data
             HStack(spacing: 4) {
                 Circle()
@@ -349,28 +350,8 @@ struct ConnectionStatusView: View {
             .padding(.vertical, 3)
             .background(Color.white.opacity(0.05))
             .cornerRadius(8)
-        } else if hasWebData {
-            // Has cached web data but not currently connected
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(Color.orange)
-                    .frame(width: 6, height: 6)
-                if let lastUpdated {
-                    Text(formatRelativeTime(lastUpdated))
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.orange)
-                } else {
-                    Text("Cached")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.orange)
-                }
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(Color.white.opacity(0.05))
-            .cornerRadius(8)
         } else {
-            // No web data - show "Open Claude" button
+            // Not connected - show "Open Claude" button
             Button(action: {
                 if let url = URL(string: "https://claude.ai/settings/usage") {
                     NSWorkspace.shared.open(url)
@@ -389,23 +370,6 @@ struct ConnectionStatusView: View {
                 .cornerRadius(8)
             }
             .buttonStyle(.plain)
-        }
-    }
-
-    private func formatRelativeTime(_ date: Date) -> String {
-        let interval = Date().timeIntervalSince(date)
-
-        if interval < 60 {
-            return "Just now"
-        } else if interval < 3600 {
-            let minutes = Int(interval / 60)
-            return "\(minutes)m ago"
-        } else if interval < 86400 {
-            let hours = Int(interval / 3600)
-            return "\(hours)h ago"
-        } else {
-            let days = Int(interval / 86400)
-            return "\(days)d ago"
         }
     }
 }

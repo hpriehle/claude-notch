@@ -9,14 +9,6 @@ import SwiftUI
 import Foundation
 
 struct ClaudeUsageData: Codable, Equatable {
-    // Web usage (from browser extension via WebSocket)
-    var sessionPercent: Int?
-    var weeklyAllPercent: Int?
-    var weeklySonnetPercent: Int?
-    var sessionResetTime: Date?
-    var weeklyAllResetTime: Date?
-    var weeklySonnetResetTime: Date?
-
     // Code usage (from ~/.claude/ logs)
     var codeWeeklyTokens: Int?
     var codeTodayTokens: Int?
@@ -37,8 +29,6 @@ struct ClaudeUsageData: Codable, Equatable {
     var oauthExtraUsagePercent: Int?
 
     // Metadata
-    var accountType: String?
-    var isConnected: Bool
     var isOAuthConnected: Bool
     var lastUpdated: Date
 
@@ -46,12 +36,6 @@ struct ClaudeUsageData: Codable, Equatable {
 
     static var empty: ClaudeUsageData {
         ClaudeUsageData(
-            sessionPercent: nil,
-            weeklyAllPercent: nil,
-            weeklySonnetPercent: nil,
-            sessionResetTime: nil,
-            weeklyAllResetTime: nil,
-            weeklySonnetResetTime: nil,
             codeWeeklyTokens: nil,
             codeTodayTokens: nil,
             codeSonnetTokens: nil,
@@ -67,18 +51,12 @@ struct ClaudeUsageData: Codable, Equatable {
             oauthExtraUsageLimitDollars: nil,
             oauthExtraUsageUsedDollars: nil,
             oauthExtraUsagePercent: nil,
-            accountType: nil,
-            isConnected: false,
             isOAuthConnected: false,
             lastUpdated: Date()
         )
     }
 
     // MARK: - Computed Properties
-
-    var hasWebData: Bool {
-        return sessionPercent != nil || weeklyAllPercent != nil
-    }
 
     var hasOAuthData: Bool {
         return oauthSessionPercent != nil || oauthWeeklyAllPercent != nil
@@ -89,24 +67,23 @@ struct ClaudeUsageData: Codable, Equatable {
     }
 
     var hasAnyData: Bool {
-        return hasWebData || hasOAuthData || hasCodeData
+        return hasOAuthData || hasCodeData
     }
 
-    // Display-friendly percentages - prefer OAuth (real API data) over web extension data
-    var displaySessionPercent: Int { oauthSessionPercent ?? sessionPercent ?? 0 }
-    var displayWeeklyAllPercent: Int { oauthWeeklyAllPercent ?? weeklyAllPercent ?? 0 }
-    var displayWeeklySonnetPercent: Int { oauthWeeklySonnetPercent ?? weeklySonnetPercent ?? 0 }
+    // Display-friendly percentages
+    var displaySessionPercent: Int { oauthSessionPercent ?? 0 }
+    var displayWeeklyAllPercent: Int { oauthWeeklyAllPercent ?? 0 }
+    var displayWeeklySonnetPercent: Int { oauthWeeklySonnetPercent ?? 0 }
     var displayWeeklyOpusPercent: Int { oauthWeeklyOpusPercent ?? 0 }
 
-    // Display-friendly reset times - prefer OAuth over web
-    var displaySessionResetTime: Date? { oauthSessionResetTime ?? sessionResetTime }
-    var displayWeeklyAllResetTime: Date? { oauthWeeklyAllResetTime ?? weeklyAllResetTime }
-    var displayWeeklySonnetResetTime: Date? { oauthWeeklySonnetResetTime ?? weeklySonnetResetTime }
+    // Display-friendly reset times
+    var displaySessionResetTime: Date? { oauthSessionResetTime }
+    var displayWeeklyAllResetTime: Date? { oauthWeeklyAllResetTime }
+    var displayWeeklySonnetResetTime: Date? { oauthWeeklySonnetResetTime }
 
     // Data source indicator
     var usageDataSource: String {
         if hasOAuthData { return "API" }
-        if hasWebData { return "Extension" }
         if hasCodeData { return "Local" }
         return "None"
     }

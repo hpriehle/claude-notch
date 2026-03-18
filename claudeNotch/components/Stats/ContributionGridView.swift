@@ -29,13 +29,14 @@ struct ContributionGridView: View {
     @State private var hoveredDay: DailyTokenData?
 
     // Grid dimensions
-    private let cellSize: CGFloat = 10
+    private let cellSize: CGFloat
     private let cellSpacing: CGFloat = 3
     private let rows = 7  // Days in a week
 
-    init(dailyTokens: [DailyTokenData], weeks: Int = 13) {
+    init(dailyTokens: [DailyTokenData], weeks: Int = 13, cellSize: CGFloat = 10) {
         self.dailyTokens = dailyTokens
         self.weeks = weeks
+        self.cellSize = cellSize
     }
 
     var body: some View {
@@ -50,13 +51,14 @@ struct ContributionGridView: View {
                                 let dayData = dailyTokens[dataIndex]
                                 CellView(
                                     intensity: dayData.intensity,
-                                    isHovered: hoveredDay?.id == dayData.id
+                                    isHovered: hoveredDay?.id == dayData.id,
+                                    size: cellSize
                                 )
                                 .onHover { hovering in
                                     hoveredDay = hovering ? dayData : nil
                                 }
                             } else {
-                                CellView(intensity: 0, isHovered: false)
+                                CellView(intensity: 0, isHovered: false, size: cellSize)
                                     .opacity(0.3)
                             }
                         }
@@ -64,7 +66,7 @@ struct ContributionGridView: View {
                 }
             }
 
-            // Legend and hover info
+            // Legend and hover info — always same height to prevent grid jiggle
             HStack {
                 // Legend
                 HStack(spacing: 4) {
@@ -75,7 +77,7 @@ struct ContributionGridView: View {
                     ForEach(0..<5, id: \.self) { intensity in
                         RoundedRectangle(cornerRadius: 2)
                             .fill(colorForIntensity(intensity))
-                            .frame(width: 10, height: 10)
+                            .frame(width: 8, height: 8)
                     }
 
                     Text("More")
@@ -83,21 +85,22 @@ struct ContributionGridView: View {
                         .foregroundColor(.gray)
                 }
 
-                Spacer()
-
-                // Hover info or default
-                if let day = hoveredDay {
-                    HStack(spacing: 4) {
-                        Text(formatDate(day.date))
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.white)
-                        Text("•")
-                            .foregroundColor(.gray)
-                        Text(formatTokens(day.tokens))
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .foregroundColor(colorForIntensity(day.intensity))
-                    }
+                // Hover info — always rendered, just hidden when not hovering
+                HStack(spacing: 4) {
+                    Text("·")
+                        .foregroundColor(.gray)
+                    Text(hoveredDay.map { formatDate($0.date) } ?? "")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.white)
+                    Text("•")
+                        .foregroundColor(.gray)
+                    Text(hoveredDay.map { formatTokens($0.tokens) } ?? "")
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundColor(hoveredDay.map { colorForIntensity($0.intensity) } ?? .clear)
                 }
+                .opacity(hoveredDay != nil ? 1 : 0)
+
+                Spacer()
             }
         }
     }
@@ -107,17 +110,17 @@ struct ContributionGridView: View {
     struct CellView: View {
         let intensity: Int
         let isHovered: Bool
+        var size: CGFloat = 10
 
         var body: some View {
             RoundedRectangle(cornerRadius: 2)
                 .fill(colorForIntensity(intensity))
-                .frame(width: 10, height: 10)
+                .frame(width: size, height: size)
                 .overlay(
                     RoundedRectangle(cornerRadius: 2)
                         .stroke(Color.white.opacity(isHovered ? 0.5 : 0), lineWidth: 1)
                 )
-                .scaleEffect(isHovered ? 1.2 : 1.0)
-                .animation(.easeInOut(duration: 0.15), value: isHovered)
+                .animation(.easeInOut(duration: 0.1), value: isHovered)
         }
     }
 
@@ -144,18 +147,11 @@ struct ContributionGridView: View {
 
 func colorForIntensity(_ intensity: Int) -> Color {
     switch intensity {
-    case 0:
-        return Color.white.opacity(0.1)
-    case 1:
-        return Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.4)  // Light green
-    case 2:
-        return Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.6)  // Medium green
-    case 3:
-        return Color(red: 16/255, green: 185/255, blue: 129/255).opacity(0.8)  // Bright green
-    case 4:
-        return Color(red: 16/255, green: 185/255, blue: 129/255)               // Full green
-    default:
-        return Color.white.opacity(0.1)
+    case 0:  return Color.white.opacity(0.08)
+    case 1:  return Color(red: 217/255, green: 119/255, blue: 87/255).opacity(0.35)
+    case 2:  return Color(red: 217/255, green: 119/255, blue: 87/255).opacity(0.55)
+    case 3:  return Color(red: 217/255, green: 119/255, blue: 87/255).opacity(0.75)
+    default: return Color(red: 217/255, green: 119/255, blue: 87/255)
     }
 }
 
@@ -193,14 +189,13 @@ extension ContributionGridView {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
 
-        // Calculate start date (totalDays - 1 days ago, aligned to start of week)
-        guard let startDate = calendar.date(byAdding: .day, value: -(totalDays - 1), to: today) else {
-            return []
-        }
-
-        // Adjust to start of week (Sunday)
-        let weekday = calendar.component(.weekday, from: startDate)
-        guard let alignedStart = calendar.date(byAdding: .day, value: -(weekday - 1), to: startDate) else {
+        // Anchor end of grid to Saturday of current week so today is always visible.
+        // alignedEnd = today + daysToSaturday (0 if today is already Saturday)
+        // alignedStart = alignedEnd - weeks*7 + 1, which is always a Sunday
+        let todayWeekday = calendar.component(.weekday, from: today)  // 1=Sun … 7=Sat
+        let daysToSaturday = (7 - todayWeekday) % 7
+        guard let alignedEnd = calendar.date(byAdding: .day, value: daysToSaturday, to: today),
+              let alignedStart = calendar.date(byAdding: .day, value: -(totalDays - 1), to: alignedEnd) else {
             return []
         }
 

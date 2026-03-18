@@ -317,10 +317,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if coordinator.firstLaunch {
-            DispatchQueue.main.async {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.showOnboardingWindow()
             }
-            playWelcomeSound()
         }
 
         // Start Claude usage monitoring service
@@ -463,14 +462,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             window.title = "Onboarding"
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
+            window.level = .floating
+            window.collectionBehavior = [.canJoinAllSpaces]
             window.contentView = NSHostingView(
                 rootView: OnboardingView(
                     step: step,
                     onFinish: {
                         window.orderOut(nil)
-//                        NSApp.setActivationPolicy(.accessory)
                         window.close()
-                        NSApp.deactivate()
                     },
                     onOpenSettings: {
                         window.close()
@@ -483,9 +482,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             onboardingWindowController = NSWindowController(window: window)
         }
 
-//        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        onboardingWindowController?.window?.makeKeyAndOrderFront(nil)
         onboardingWindowController?.window?.orderFrontRegardless()
     }
 }

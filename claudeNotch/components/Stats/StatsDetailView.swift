@@ -84,9 +84,9 @@ struct StatsDetailView: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.gray)
 
-                if vm.usageData.hasOAuthData || vm.usageData.hasWebData {
+                if vm.usageData.hasOAuthData {
                     // Weekly forecast
-                    let weeklyPercent = vm.usageData.oauthWeeklyAllPercent ?? vm.usageData.weeklyAllPercent
+                    let weeklyPercent = vm.usageData.oauthWeeklyAllPercent
                     if let weeklyPercent = weeklyPercent {
                         RateLimitRow(
                             label: "Weekly",
@@ -97,7 +97,7 @@ struct StatsDetailView: View {
                     }
 
                     // Session forecast
-                    let sessionPercent = vm.usageData.oauthSessionPercent ?? vm.usageData.sessionPercent
+                    let sessionPercent = vm.usageData.oauthSessionPercent
                     if let sessionPercent = sessionPercent {
                         RateLimitRow(
                             label: "Session",

@@ -530,13 +530,11 @@ struct GeneralSettings: View {
 
 // Claude Settings view
 struct ClaudeSettings: View {
-    @Default(.showConnectionStatus) var showConnectionStatus
     @Default(.showSessionUsage) var showSessionUsage
     @Default(.showWeeklyAllUsage) var showWeeklyAllUsage
     @Default(.showWeeklySonnetUsage) var showWeeklySonnetUsage
     @Default(.usageWarningThreshold) var usageWarningThreshold
     @Default(.usageCriticalThreshold) var usageCriticalThreshold
-    @Default(.webSocketPort) var webSocketPort
 
     @ObservedObject var usageService = ClaudeUsageService.shared
     @State private var isConnecting = false
@@ -550,12 +548,12 @@ struct ClaudeSettings: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(usageService.hasOAuthData ? Color.green : Color.gray.opacity(0.5))
+                                .fill(usageService.currentUsage.hasOAuthData ? Color.green : (usageService.hasOAuthData ? Color.yellow.opacity(0.8) : Color.gray.opacity(0.5)))
                                 .frame(width: 8, height: 8)
-                            Text(usageService.hasOAuthData ? "Connected via Claude Code" : "Not connected")
+                            Text(usageService.currentUsage.hasOAuthData ? "Connected via Claude Code" : (usageService.hasOAuthData ? "Connecting..." : "Not connected"))
                                 .font(.system(size: 13, weight: .medium))
                         }
-                        if usageService.hasOAuthData {
+                        if usageService.currentUsage.hasOAuthData {
                             Text("Usage data refreshes every 120 seconds from Anthropic API")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -567,11 +565,20 @@ struct ClaudeSettings: View {
                     }
                     Spacer()
 
-                    if usageService.hasOAuthData {
-                        Button("Refresh") {
+                    if usageService.currentUsage.hasOAuthData || usageService.hasOAuthData {
+                        Button {
                             usageService.refresh()
+                        } label: {
+                            if usageService.isRefreshing {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .frame(width: 60)
+                            } else {
+                                Text("Refresh")
+                            }
                         }
                         .buttonStyle(.bordered)
+                        .disabled(usageService.isRefreshing)
                     } else {
                         Button(isConnecting ? "Connecting..." : "Connect") {
                             connectClaudeAccount()
@@ -581,7 +588,7 @@ struct ClaudeSettings: View {
                     }
                 }
 
-                if let error = connectionError {
+                if let error = connectionError ?? usageService.lastRefreshError {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.caption)
@@ -592,7 +599,7 @@ struct ClaudeSettings: View {
                     }
                 }
 
-                if !usageService.hasOAuthData {
+                if !usageService.currentUsage.hasOAuthData {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Setup")
                             .font(.caption)
@@ -640,24 +647,12 @@ struct ClaudeSettings: View {
             } header: {
                 HStack {
                     Text("Claude API Connection")
-                    if usageService.hasOAuthData {
+                    if usageService.currentUsage.hasOAuthData {
                         customBadge(text: "Active")
                     }
                 }
             } footer: {
                 Text("Reads OAuth tokens from Claude Code CLI to fetch real usage data directly from Anthropic's API. No browser extension needed.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Defaults.Toggle(key: .showConnectionStatus) {
-                    Text("Show connection status")
-                }
-            } header: {
-                Text("Browser Extension")
-            } footer: {
-                Text("Fallback: shows whether the browser extension is connected and sending data.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -712,25 +707,6 @@ struct ClaudeSettings: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section {
-                HStack {
-                    Text("WebSocket Port")
-                    Spacer()
-                    TextField("Port", value: $webSocketPort, format: .number)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 80)
-                        .multilineTextAlignment(.trailing)
-                }
-            } header: {
-                HStack {
-                    Text("Advanced")
-                    customBadge(text: "Phase 2")
-                }
-            } footer: {
-                Text("The port used for browser extension communication. Restart required after changing.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
         }
         .accentColor(.effectiveAccent)
         .navigationTitle("Claude")

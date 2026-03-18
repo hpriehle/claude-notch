@@ -24,6 +24,8 @@ class UsageNotificationManager: ObservableObject {
     // MARK: - Initialization
 
     private init() {
+        // Always enforce the canonical thresholds (overrides any persisted user value)
+        Defaults[.usageNotificationThresholds] = [90, 95, 99]
         requestNotificationPermission()
         setupUsageObserver()
     }
@@ -61,21 +63,28 @@ class UsageNotificationManager: ObservableObject {
         // Check for reset (clear notifications if reset time changed)
         checkForReset(usage: usage)
 
-        // Check session thresholds
-        if let sessionPercent = usage.sessionPercent {
+        // Use display values (prefer OAuth over web extension, same as UI)
+        let sessionPercent = usage.displaySessionPercent
+        let weeklyPercent = usage.displayWeeklyAllPercent
+
+        // If OAuth is configured, wait for OAuth data before notifying —
+        // prevents firing on stale web extension data while OAuth loads.
+        let oauthConfigured = ClaudeOAuthUsageFetcher.shared.isConfigured
+        let readyToNotify = !oauthConfigured || usage.hasOAuthData
+
+        // Check session thresholds (only if we have trustworthy data)
+        if usage.hasAnyData && readyToNotify {
             for threshold in thresholds {
                 if sessionPercent >= threshold && !notifiedSessionThresholds.contains(threshold) {
-                    sendSessionNotification(percent: sessionPercent, threshold: threshold, resetTime: usage.sessionResetTime)
+                    sendSessionNotification(percent: sessionPercent, threshold: threshold, resetTime: usage.displaySessionResetTime)
                     notifiedSessionThresholds.insert(threshold)
                 }
             }
-        }
 
-        // Check weekly thresholds
-        if let weeklyPercent = usage.weeklyAllPercent {
+            // Check weekly thresholds
             for threshold in thresholds {
                 if weeklyPercent >= threshold && !notifiedWeeklyThresholds.contains(threshold) {
-                    sendWeeklyNotification(percent: weeklyPercent, threshold: threshold, resetTime: usage.weeklyAllResetTime)
+                    sendWeeklyNotification(percent: weeklyPercent, threshold: threshold, resetTime: usage.displayWeeklyAllResetTime)
                     notifiedWeeklyThresholds.insert(threshold)
                 }
             }
@@ -85,10 +94,9 @@ class UsageNotificationManager: ObservableObject {
     // MARK: - Reset Detection
 
     private func checkForReset(usage: ClaudeUsageData) {
-        // If session reset time is in the future and different from last known, reset session notifications
-        if let sessionReset = usage.sessionResetTime {
+        // Use display values (prefer OAuth) for reset detection
+        if let sessionReset = usage.displaySessionResetTime {
             if lastSessionResetTime == nil || sessionReset != lastSessionResetTime {
-                // New session period
                 if let lastReset = lastSessionResetTime, sessionReset > lastReset {
                     notifiedSessionThresholds.removeAll()
                     print("[UsageNotificationManager] Session reset detected, clearing session notifications")
@@ -97,8 +105,7 @@ class UsageNotificationManager: ObservableObject {
             }
         }
 
-        // Same for weekly
-        if let weeklyReset = usage.weeklyAllResetTime {
+        if let weeklyReset = usage.displayWeeklyAllResetTime {
             if lastWeeklyResetTime == nil || weeklyReset != lastWeeklyResetTime {
                 if let lastReset = lastWeeklyResetTime, weeklyReset > lastReset {
                     notifiedWeeklyThresholds.removeAll()

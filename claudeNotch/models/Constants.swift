@@ -79,15 +79,13 @@ extension Defaults.Keys {
     static let didClearLegacyURLCacheV1 = Key<Bool>("didClearLegacyURLCache_v1", default: false)
 
     // MARK: Claude Usage
-    static let showConnectionStatus = Key<Bool>("showConnectionStatus", default: true)
     static let showSessionUsage = Key<Bool>("showSessionUsage", default: true)
     static let showWeeklyAllUsage = Key<Bool>("showWeeklyAllUsage", default: true)
     static let showWeeklySonnetUsage = Key<Bool>("showWeeklySonnetUsage", default: true)
     static let usageWarningThreshold = Key<Int>("usageWarningThreshold", default: 75)
     static let usageCriticalThreshold = Key<Int>("usageCriticalThreshold", default: 90)
-    static let webSocketPort = Key<UInt16>("webSocketPort", default: 8765)
 
     // MARK: Usage Notifications
     static let enableUsageNotifications = Key<Bool>("enableUsageNotifications", default: true)
-    static let usageNotificationThresholds = Key<[Int]>("usageNotificationThresholds", default: [70, 85, 95])
+    static let usageNotificationThresholds = Key<[Int]>("usageNotificationThresholds", default: [90, 95, 99])
 }

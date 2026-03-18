@@ -58,9 +58,9 @@ final class UsageHistoryStore {
 
     /// Record a snapshot for the current hour. Skips if value hasn't changed enough.
     func record(_ data: ClaudeUsageData) {
-        let session     = data.oauthSessionPercent     ?? data.sessionPercent     ?? -1
-        let weeklyAll   = data.oauthWeeklyAllPercent   ?? data.weeklyAllPercent   ?? -1
-        let weeklySonnet = data.oauthWeeklySonnetPercent ?? data.weeklySonnetPercent ?? -1
+        let session     = data.oauthSessionPercent     ?? -1
+        let weeklyAll   = data.oauthWeeklyAllPercent   ?? -1
+        let weeklySonnet = data.oauthWeeklySonnetPercent ?? -1
         guard session >= 0 else { return }
 
         let key = hourKey(for: Date())

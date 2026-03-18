@@ -30,6 +30,7 @@
 		11C5E3162DFE88510065821E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11C5E3152DFE88510065821E /* SettingsView.swift */; };
 		11CC44A22CEE614100C7244B /* ClaudeViewCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CC44A12CEE614100C7244B /* ClaudeViewCoordinator.swift */; };
 		11CFC65B2E097E9D00748C80 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CFC65A2E097E9D00748C80 /* WelcomeView.swift */; };
+		11CFC6702E097E9D00748C80 /* ClaudeLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CFC6712E097E9D00748C80 /* ClaudeLoginView.swift */; };
 		11CFC65F2E097F2F00748C80 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CFC65E2E097F2100748C80 /* OnboardingView.swift */; };
 		11CFC6612E097F6800748C80 /* PermissionsRequestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CFC6602E097F6800748C80 /* PermissionsRequestView.swift */; };
 		11CFC6652E09C7B300748C80 /* OnboardingFinishView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CFC6642E09C7B300748C80 /* OnboardingFinishView.swift */; };
@@ -69,6 +70,7 @@
 		9A7CA46678D2143899C15045 /* ClaudeOAuthCredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0FE66EE798DF4953042FFBF /* ClaudeOAuthCredentialStore.swift */; };
 		B60DC96F8A6914D88D751DE6 /* ClaudeOAuthUsageFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1B95F53EE87654F2135B57 /* ClaudeOAuthUsageFetcher.swift */; };
 		08DCDD549B6049D198BD64CB /* UsageHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A6B52C490204855A1FE74A1 /* UsageHistoryStore.swift */; };
+		F1A2B3C4D5E6F7A8B9C0D1E2 /* DailyTokenCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* DailyTokenCache.swift */; };
 		A68E786AF3A2495A984C4AFA /* HorizontalScrollPageDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE607E20552D46EEA123BBBF /* HorizontalScrollPageDetector.swift */; };
 		1E7C3796ADCB4B179EB5873D /* UsageHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5A848E19B3B46D49A376A95 /* UsageHistoryView.swift */; };
 		3B81628BD6F248798055A619 /* ClaudeUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2935107D0F8E40A895E17045 /* ClaudeUsageView.swift */; };
@@ -109,7 +111,6 @@
 		B1FEB4992C7686630066EBBC /* PanGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1FEB4982C7686630066EBBC /* PanGesture.swift */; };
 		EADFB877C07DB99760FDB6D7 /* ContributionGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51D0862F5B0C95629FC905FA /* ContributionGridView.swift */; };
 		EC5D730E767F88F6BA33ED17 /* UsageCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B27F82BDE2752E49AC76B1F /* UsageCalculator.swift */; };
-		EF78314208CECF5B9439E99B /* WebSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 916F3BCE58025A60E56AC772 /* WebSocketServer.swift */; };
 		FC49883DAC49AF22D50906F7 /* UsageNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2E222B1549749C9A4D87BA /* UsageNotificationManager.swift */; };
 /* End PBXBuildFile section */
 
@@ -166,6 +167,7 @@
 		11C5E3152DFE88510065821E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		11CC44A12CEE614100C7244B /* ClaudeViewCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeViewCoordinator.swift; sourceTree = "<group>"; };
 		11CFC65A2E097E9D00748C80 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		11CFC6712E097E9D00748C80 /* ClaudeLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeLoginView.swift; sourceTree = "<group>"; };
 		11CFC65E2E097F2100748C80 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		11CFC6602E097F6800748C80 /* PermissionsRequestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionsRequestView.swift; sourceTree = "<group>"; };
 		11CFC6642E09C7B300748C80 /* OnboardingFinishView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFinishView.swift; sourceTree = "<group>"; };
@@ -213,7 +215,6 @@
 		66CE5D4FE156490A9A14A176 /* ClaudeUsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageData.swift; sourceTree = "<group>"; };
 		7E2E222B1549749C9A4D87BA /* UsageNotificationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UsageNotificationManager.swift; sourceTree = "<group>"; };
 		891928D537C3CFFD1555DEFA /* StatsDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StatsDetailView.swift; sourceTree = "<group>"; };
-		916F3BCE58025A60E56AC772 /* WebSocketServer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WebSocketServer.swift; sourceTree = "<group>"; };
 		9A0887312C7A693000C160EA /* TabButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabButton.swift; sourceTree = "<group>"; };
 		9A0887342C7AFF8E00C160EA /* TabSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSelectionView.swift; sourceTree = "<group>"; };
 		B10348D82C74E56000475897 /* ConditionalModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConditionalModifier.swift; sourceTree = "<group>"; };
@@ -243,6 +244,7 @@
 		B0FE66EE798DF4953042FFBF /* ClaudeOAuthCredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthCredentialStore.swift; sourceTree = "<group>"; };
 		9F1B95F53EE87654F2135B57 /* ClaudeOAuthUsageFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthUsageFetcher.swift; sourceTree = "<group>"; };
 		6A6B52C490204855A1FE74A1 /* UsageHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageHistoryStore.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* DailyTokenCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyTokenCache.swift; sourceTree = "<group>"; };
 		EE607E20552D46EEA123BBBF /* HorizontalScrollPageDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HorizontalScrollPageDetector.swift; sourceTree = "<group>"; };
 		A5A848E19B3B46D49A376A95 /* UsageHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageHistoryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -584,6 +586,7 @@
 				11CFC6602E097F6800748C80 /* PermissionsRequestView.swift */,
 				11CFC65E2E097F2100748C80 /* OnboardingView.swift */,
 				11CFC65A2E097E9D00748C80 /* WelcomeView.swift */,
+				11CFC6712E097E9D00748C80 /* ClaudeLoginView.swift */,
 				B141C2402CA5F53E00AC8CC8 /* SparkleView.swift */,
 			);
 			path = Onboarding;
@@ -625,8 +628,6 @@
 				14D570C52C5F38210011E668 /* ClaudeHeader.swift */,
 				32A89ECB6D20447780D58AB6 /* ClaudeCompactView.swift */,
 				2935107D0F8E40A895E17045 /* ClaudeUsageView.swift */,
-				6A6B52C490204855A1FE74A1 /* UsageHistoryStore.swift */,
-				EE607E20552D46EEA123BBBF /* HorizontalScrollPageDetector.swift */,
 				A5A848E19B3B46D49A376A95 /* UsageHistoryView.swift */,
 				D4E5F6A7B8C901234567EFGH /* SessionBarView.swift */,
 				14D570D12C5F6C6A0011E668 /* BoringExtrasMenu.swift */,
@@ -682,10 +683,10 @@
 				372084FBE13A6AAE84F45EAC /* JSONLParser.swift */,
 				0F8D7A19F6985A5F2FCE7F02 /* ClaudeLogMonitor.swift */,
 				5B27F82BDE2752E49AC76B1F /* UsageCalculator.swift */,
-				916F3BCE58025A60E56AC772 /* WebSocketServer.swift */,
 				E0847197D491BCD6ED3B8B4F /* ClaudeUsageService.swift */,
 				9F1B95F53EE87654F2135B57 /* ClaudeOAuthUsageFetcher.swift */,
 				6A6B52C490204855A1FE74A1 /* UsageHistoryStore.swift */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* DailyTokenCache.swift */,
 				EE607E20552D46EEA123BBBF /* HorizontalScrollPageDetector.swift */,
 				B0FE66EE798DF4953042FFBF /* ClaudeOAuthCredentialStore.swift */,
 				7E2E222B1549749C9A4D87BA /* UsageNotificationManager.swift */,
@@ -844,6 +845,7 @@
 				B186543C2C6F49AE000B926A /* ShortcutConstants.swift in Sources */,
 				B1D365CE2C6A979C0047BDBC /* LiveActivityModifier.swift in Sources */,
 				11CFC65B2E097E9D00748C80 /* WelcomeView.swift in Sources */,
+				11CFC6702E097E9D00748C80 /* ClaudeLoginView.swift in Sources */,
 				14D570C02C5EA5870011E668 /* AnimatedFace.swift in Sources */,
 				B1D6FD432C6603730015F173 /* SoftwareUpdater.swift in Sources */,
 				111BE9952ECF2DF40079DD4E /* DragDetector.swift in Sources */,
@@ -915,11 +917,11 @@
 				1806B6EA5787EDCD00469329 /* JSONLParser.swift in Sources */,
 				6B0AEB61C3A7367480655B8F /* ClaudeLogMonitor.swift in Sources */,
 				EC5D730E767F88F6BA33ED17 /* UsageCalculator.swift in Sources */,
-				EF78314208CECF5B9439E99B /* WebSocketServer.swift in Sources */,
 				245A4418DD1EDD0EC7C1C4A1 /* ClaudeUsageService.swift in Sources */,
 				9A7CA46678D2143899C15045 /* ClaudeOAuthCredentialStore.swift in Sources */,
 				B60DC96F8A6914D88D751DE6 /* ClaudeOAuthUsageFetcher.swift in Sources */,
 				08DCDD549B6049D198BD64CB /* UsageHistoryStore.swift in Sources */,
+				F1A2B3C4D5E6F7A8B9C0D1E2 /* DailyTokenCache.swift in Sources */,
 				A68E786AF3A2495A984C4AFA /* HorizontalScrollPageDetector.swift in Sources */,
 				1E7C3796ADCB4B179EB5873D /* UsageHistoryView.swift in Sources */,
 				FC49883DAC49AF22D50906F7 /* UsageNotificationManager.swift in Sources */,

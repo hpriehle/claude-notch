@@ -2,232 +2,272 @@
 //  UsageHistoryView.swift
 //  claudeNotch
 //
-//  GitHub-style hourly usage history grid.
-//  Layout: 7 rows (days, oldest at top) × 24 columns (hours, midnight at left).
-//  At cellSize=9, gap=2: grid is 264pt wide × 77pt tall — fits the 640×300pt notch.
+//  Swipe page 2: Activity & Stats
+//  Shows lifetime stats, daily token-activity grid (13 weeks), and session depth breakdown.
 //
 
 import SwiftUI
 
 struct UsageHistoryView: View {
     @EnvironmentObject var vm: ClaudeViewModel
-    @StateObject private var store = UsageHistoryStoreObservable.shared
 
-    @State private var selectedMetric: HistoryMetric = .session
-    @State private var hoveredCell: (day: Int, hour: Int)? = nil
+    @State private var contributionData: [DailyTokenData] = []
+    @State private var gridTokenData: [StatsCache.DailyModelTokens] = []
+    @State private var totalSessions: Int = 0
+    @State private var totalMessages: Int = 0
+    @State private var totalTokens: Int = 0
+    @State private var peakHour: String = "--"
+    @State private var sessionBreakdown: SessionBreakdown? = nil
+    @State private var gridWidth: CGFloat = 0
+    @State private var lastComputedDate: String = ""
+    @State private var jsonlDailyTokens: [String: Int] = [:]
 
-    private let cellSize: CGFloat = 9
-    private let cellGap: CGFloat  = 2
+    private let parser = JSONLParser()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             headerRow
+            statsRow
             gridSection
-            legendRow
+            if let breakdown = sessionBreakdown, breakdown.total > 0 {
+                sessionDepthSection(breakdown)
+            }
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 28)
         .padding(.top, 16)
         .padding(.bottom, 20)
+        .onAppear { loadData() }
+        .onReceive(NotificationCenter.default.publisher(for: .claudeUsageDataReceived)) { _ in
+            loadData()
+        }
     }
 
     // MARK: - Header
 
     private var headerRow: some View {
         HStack {
-            Image(systemName: "clock.arrow.circlepath")
+            Image(systemName: "chart.bar.fill")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
-            Text("Usage History")
+            Text("Activity")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
             Spacer()
-            metricPicker
         }
     }
 
-    private var metricPicker: some View {
+    // MARK: - Stats Row
+
+    private var todayKey: String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone.current
+        return f.string(from: Date())
+    }
+
+    private var statsRow: some View {
         HStack(spacing: 0) {
-            ForEach(HistoryMetric.allCases, id: \.self) { metric in
-                Button(action: { selectedMetric = metric }) {
-                    Text(metric.rawValue)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(selectedMetric == metric ? .black : .gray)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            selectedMetric == metric
-                                ? Color.white.opacity(0.85)
-                                : Color.clear
-                        )
-                        .cornerRadius(4)
-                }
-                .buttonStyle(.plain)
-            }
+            activityStatItem(label: "Sessions", value: formatNumber(totalSessions))
+            Spacer()
+            activityStatItem(label: "Messages", value: formatNumber(totalMessages))
+            Spacer()
+            activityStatItem(label: "Today", value: formatTokens(jsonlDailyTokens[todayKey] ?? 0))
+            Spacer()
+            activityStatItem(label: "Peak Hour", value: peakHour)
         }
-        .background(Color.white.opacity(0.1))
-        .cornerRadius(5)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(8)
     }
 
-    // MARK: - Grid
+    private func activityStatItem(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundColor(.gray)
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                .foregroundColor(.white)
+        }
+    }
+
+    // MARK: - Contribution Grid
 
     private var gridSection: some View {
-        let grid = store.grid()
-
-        return VStack(alignment: .leading, spacing: 4) {
-            // Hour labels (0, 6, 12, 18)
-            hourLabels
-
-            // 7 rows (days) × 24 columns (hours)
-            VStack(spacing: cellGap) {
-                ForEach(0..<7, id: \.self) { day in
-                    HStack(spacing: cellGap) {
-                        // Day label (3-char)
-                        Text(dayLabel(day))
-                            .font(.system(size: 7))
-                            .foregroundColor(.gray)
-                            .frame(width: 18, alignment: .leading)
-
-                        ForEach(0..<24, id: \.self) { hour in
-                            let snap = grid[day][hour]
-                            let pct  = snap.map { selectedMetric.value(from: $0) }
-                            HistoryCellView(
-                                percent:   pct,
-                                isHovered: hoveredCell?.day == day && hoveredCell?.hour == hour
-                            )
-                            .onHover { hovering in
-                                hoveredCell = hovering ? (day: day, hour: hour) : nil
-                            }
-                        }
-                    }
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text("Token Activity")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.gray)
+                Spacer()
+                if !lastComputedDate.isEmpty {
+                    Text("updated \(lastComputedDate)")
+                        .font(.system(size: 9))
+                        .foregroundColor(.gray.opacity(0.6))
                 }
             }
 
-            // Tooltip row
-            tooltipRow(grid: grid)
-        }
-    }
-
-    private var hourLabels: some View {
-        HStack(spacing: cellGap) {
-            Color.clear.frame(width: 18)  // spacer aligning with day labels
-            ForEach(0..<24, id: \.self) { hour in
-                Group {
-                    if hour % 6 == 0 {
-                        Text("\(hour)")
-                            .font(.system(size: 7))
-                            .foregroundColor(.gray)
-                    } else {
-                        Color.clear
-                    }
+            if contributionData.isEmpty {
+                HStack {
+                    Spacer()
+                    Text("No activity data yet")
+                        .font(.system(size: 10))
+                        .foregroundColor(.gray)
+                    Spacer()
                 }
-                .frame(width: cellSize)
-            }
-        }
-    }
-
-    private func tooltipRow(grid: [[UsageSnapshot?]]) -> some View {
-        Group {
-            if let h = hoveredCell {
-                let snap = grid[h.day][h.hour]
-                HStack(spacing: 4) {
-                    Text(cellLabel(day: h.day, hour: h.hour))
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                    if let s = snap {
-                        Text("·")
-                            .foregroundColor(.gray)
-                        Text("\(selectedMetric.value(from: s))%")
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .foregroundColor(vm.usageData.colorForPercent(selectedMetric.value(from: s)))
-                    } else {
-                        Text("· No data")
-                            .font(.system(size: 9))
-                            .foregroundColor(.gray)
-                    }
-                }
+                .frame(height: 60)
             } else {
+                // Measure available width via .background(GeometryReader) — avoids width=0 on first pass
                 Color.clear
+                    .frame(height: 0)
+                    .background(GeometryReader { geo in
+                        Color.clear
+                            .onAppear { gridWidth = geo.size.width }
+                            .onChange(of: geo.size.width) { _, newWidth in gridWidth = newWidth }
+                    })
+
+                let weeksToShow = gridWidth > 0
+                    ? min(52, max(13, Int((gridWidth + 3) / 13)))
+                    : 13
+                let cellSize: CGFloat = gridWidth > 0
+                    ? (gridWidth - CGFloat(weeksToShow - 1) * 3) / CGFloat(weeksToShow)
+                    : 10
+                let processed = ContributionGridView.processTokenData(from: mergedDailyTokens(), weeks: weeksToShow)
+                ContributionGridView(dailyTokens: processed, weeks: weeksToShow, cellSize: cellSize)
+                    .frame(height: 99)
             }
         }
-        .frame(height: 14)
     }
 
-    // MARK: - Legend
+    // MARK: - Session Depth
 
-    private var legendRow: some View {
-        HStack(spacing: 6) {
-            Text("Less")
-                .font(.system(size: 9))
+    private func sessionDepthSection(_ breakdown: SessionBreakdown) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Session Depth")
+                .font(.system(size: 10, weight: .medium))
                 .foregroundColor(.gray)
-            ForEach([0, 25, 50, 75, 100], id: \.self) { pct in
-                HistoryCellView(percent: pct == 0 ? nil : pct, isHovered: false)
-            }
-            Text("More")
-                .font(.system(size: 9))
-                .foregroundColor(.gray)
-            Spacer()
-            if store.snapshots.isEmpty {
-                Text("Collecting data…")
+
+            depthRow(label: "Quick", sublabel: "<5 msgs", count: breakdown.quickCount, total: breakdown.total, color: Color(red: 16/255, green: 185/255, blue: 129/255))
+            depthRow(label: "Focused", sublabel: "5–20", count: breakdown.focusedCount, total: breakdown.total, color: Color(red: 245/255, green: 158/255, blue: 11/255))
+            depthRow(label: "Deep", sublabel: "20+", count: breakdown.deepCount, total: breakdown.total, color: Color(red: 249/255, green: 115/255, blue: 22/255))
+        }
+    }
+
+    private func depthRow(label: String, sublabel: String, count: Int, total: Int, color: Color) -> some View {
+        HStack(spacing: 8) {
+            // Labels
+            HStack(spacing: 4) {
+                Text(label)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.85))
+                    .frame(width: 46, alignment: .leading)
+                Text(sublabel)
                     .font(.system(size: 9))
                     .foregroundColor(.gray)
+                    .frame(width: 36, alignment: .leading)
             }
+
+            // Bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.white.opacity(0.08))
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(color.opacity(0.75))
+                        .frame(width: total > 0 ? geo.size.width * CGFloat(count) / CGFloat(total) : 0)
+                }
+            }
+            .frame(height: 6)
+
+            // Count
+            Text("\(count)")
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundColor(.gray)
+                .frame(width: 32, alignment: .trailing)
         }
+    }
+
+    // MARK: - Data Loading
+
+    private func loadData() {
+        guard let stats = parser.parseStatsCache() else { return }
+
+        gridTokenData = stats.dailyModelTokens ?? []
+        contributionData = ContributionGridView.processTokenData(from: stats.dailyModelTokens, weeks: 13)
+        totalSessions = stats.totalSessions ?? 0
+        totalMessages = stats.totalMessages ?? 0
+        totalTokens = computeTotalTokens(from: stats.modelUsage)
+        peakHour = computePeakHour(from: stats.hourCounts)
+        lastComputedDate = formatLastComputed(stats.lastComputedDate)
+
+        // Read from disk cache — instant. The cache is built/updated by ClaudeUsageService.start().
+        jsonlDailyTokens = DailyTokenCache.shared.load()
     }
 
     // MARK: - Helpers
 
-    private func dayLabel(_ dayIdx: Int) -> String {
-        let labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-        let cal = Calendar.current
-        guard let date = cal.date(byAdding: .day, value: -(6 - dayIdx), to: Date()) else {
-            return "???"
+    private func mergedDailyTokens() -> [StatsCache.DailyModelTokens] {
+        var merged: [String: [String: Int]] = [:]
+        // Stats-cache as baseline for dates not in JSONL cache
+        for entry in gridTokenData {
+            if let m = entry.tokensByModel { merged[entry.date] = m }
         }
-        let weekday = cal.component(.weekday, from: date) - 1
-        return labels[weekday]
+        // JSONL output-token data wins for any date it has (consistent scale across all dates)
+        for (date, tokens) in jsonlDailyTokens {
+            merged[date] = ["jsonl-output": tokens]
+        }
+        return merged.map { StatsCache.DailyModelTokens(date: $0.key, tokensByModel: $0.value) }
     }
 
-    private func cellLabel(day: Int, hour: Int) -> String {
-        let cal = Calendar.current
-        guard let date = cal.date(byAdding: .day, value: -(6 - day), to: Date()) else { return "--" }
+    private func computeTotalTokens(from modelUsage: [String: StatsCache.ModelStats]?) -> Int {
+        guard let usage = modelUsage else { return 0 }
+        return usage.values.reduce(0) { acc, m in
+            acc + (m.inputTokens ?? 0) + (m.outputTokens ?? 0)
+                + (m.cacheReadInputTokens ?? 0) + (m.cacheCreationInputTokens ?? 0)
+        }
+    }
+
+    private func computePeakHour(from hourCounts: [String: Int]?) -> String {
+        guard let counts = hourCounts, !counts.isEmpty,
+              let maxKey = counts.max(by: { $0.value < $1.value })?.key,
+              let hour = Int(maxKey) else { return "--" }
+        // hourCounts keys are UTC hours (JSONL timestamps end in Z).
+        // Build the date in UTC, then let DateFormatter display in local time.
+        var utcCal = Calendar(identifier: .gregorian)
+        utcCal.timeZone = TimeZone(identifier: "UTC")!
+        let date = utcCal.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()
         let fmt = DateFormatter()
-        fmt.dateFormat = "MMM d"
-        return "\(fmt.string(from: date)) \(String(format: "%02d:00", hour))"
-    }
-}
-
-// MARK: - Cell View
-
-private struct HistoryCellView: View {
-    let percent: Int?
-    let isHovered: Bool
-
-    private let size: CGFloat = 9
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: 2)
-            .fill(fillColor)
-            .frame(width: size, height: size)
-            .overlay(
-                RoundedRectangle(cornerRadius: 2)
-                    .stroke(Color.white.opacity(isHovered ? 0.7 : 0), lineWidth: 1)
-            )
-            .scaleEffect(isHovered ? 1.3 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: isHovered)
+        fmt.dateFormat = "h a"
+        // timeZone defaults to TimeZone.current — auto-converts UTC → local
+        return fmt.string(from: date).lowercased()
     }
 
-    private var fillColor: Color {
-        guard let pct = percent else {
-            return Color.white.opacity(0.08)
-        }
-        let base: Color
-        switch pct {
-        case 0..<50:  base = Color(red: 16/255,  green: 185/255, blue: 129/255)  // green
-        case 50..<80: base = Color(red: 245/255, green: 158/255, blue: 11/255)   // amber
-        case 80..<95: base = Color(red: 249/255, green: 115/255, blue: 22/255)   // orange
-        default:      base = Color(red: 239/255, green: 68/255,  blue: 68/255)   // red
-        }
-        let opacity = 0.25 + (Double(pct) / 100.0) * 0.75
-        return base.opacity(opacity)
+    private func formatNumber(_ num: Int) -> String {
+        if num >= 1_000_000 { return String(format: "%.1fM", Double(num) / 1_000_000) }
+        if num >= 1_000 { return String(format: "%.1fK", Double(num) / 1_000) }
+        return "\(num)"
+    }
+
+    private func formatLastComputed(_ raw: String?) -> String {
+        guard let raw = raw else { return "" }
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        let date = fmt.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+        guard let date = date else { return "" }
+        let out = DateFormatter()
+        out.dateFormat = "MMM d"
+        return out.string(from: date)
+    }
+
+    private func formatTokens(_ tokens: Int) -> String {
+        if tokens >= 1_000_000_000 { return String(format: "%.1fB", Double(tokens) / 1_000_000_000) }
+        if tokens >= 1_000_000 { return String(format: "%.1fM", Double(tokens) / 1_000_000) }
+        if tokens >= 1_000 { return String(format: "%.0fK", Double(tokens) / 1_000) }
+        return "\(tokens)"
     }
 }
 

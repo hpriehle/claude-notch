@@ -19,7 +19,7 @@ struct ClaudeCompactView: View {
         HStack(spacing: 8) {
             // Connection indicator dot
             Circle()
-                .fill(vm.isExtensionConnected ? Color.green : Color.gray.opacity(0.5))
+                .fill(vm.usageData.isOAuthConnected ? Color.green : Color.gray.opacity(0.5))
                 .frame(width: 6, height: 6)
 
             // Staleness indicator - orange dot when data is old (only show if we have data)
@@ -37,10 +37,10 @@ struct ClaudeCompactView: View {
                 Text("--")
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundColor(.gray)
-            } else if vm.usageData.hasOAuthData || vm.usageData.hasWebData {
-                // API or web data available - show percentages
-                let sessionPercent = vm.usageData.oauthSessionPercent ?? vm.usageData.sessionPercent
-                let weeklyAllPercent = vm.usageData.oauthWeeklyAllPercent ?? vm.usageData.weeklyAllPercent
+            } else if vm.usageData.hasOAuthData {
+                // API data available - show percentages
+                let sessionPercent = vm.usageData.oauthSessionPercent
+                let weeklyAllPercent = vm.usageData.oauthWeeklyAllPercent
 
                 // Session percentage
                 if Defaults[.showSessionUsage], let sessionPercent = sessionPercent {

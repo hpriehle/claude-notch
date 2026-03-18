@@ -36,7 +36,6 @@ class ClaudeViewModel: NSObject, ObservableObject {
 
     // Claude-specific properties
     @Published var usageData: ClaudeUsageData = .empty
-    @Published var isExtensionConnected: Bool = false
 
     private var usageDataObserver: Any?
 
@@ -71,9 +70,8 @@ class ClaudeViewModel: NSObject, ObservableObject {
             queue: .main
         ) { [weak self] notification in
             if let data = notification.userInfo?["data"] as? ClaudeUsageData {
-                print("[ClaudeViewModel] RECEIVED: session=\(data.sessionPercent ?? -1)%, weekly=\(data.weeklyAllPercent ?? -1)%")
+                print("[ClaudeViewModel] RECEIVED: session=\(data.oauthSessionPercent ?? -1)%, weekly=\(data.oauthWeeklyAllPercent ?? -1)%")
                 self?.usageData = data
-                self?.isExtensionConnected = data.isConnected || data.isOAuthConnected
             }
         }
     }

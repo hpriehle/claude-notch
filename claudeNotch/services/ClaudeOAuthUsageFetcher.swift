@@ -16,6 +16,7 @@ struct OAuthUsageResponse: Codable {
     let sevenDayOauthApps: OAuthRateWindow?
     let sevenDayOpus: OAuthRateWindow?
     let sevenDaySonnet: OAuthRateWindow?
+    let sevenDayCowork: OAuthRateWindow?
     let iguanaNecktie: OAuthRateWindow?
     let extraUsage: OAuthExtraUsage?
 
@@ -25,6 +26,7 @@ struct OAuthUsageResponse: Codable {
         case sevenDayOauthApps = "seven_day_oauth_apps"
         case sevenDayOpus = "seven_day_opus"
         case sevenDaySonnet = "seven_day_sonnet"
+        case sevenDayCowork = "seven_day_cowork"
         case iguanaNecktie = "iguana_necktie"
         case extraUsage = "extra_usage"
     }
@@ -128,6 +130,8 @@ class ClaudeOAuthUsageFetcher {
 
     private var refreshTimer: Timer?
     private var lastSnapshot: OAuthUsageSnapshot?
+    /// Skip counter for 429 backoff — each 429 sets this to 2, skipping 2 polls (~4 min cooldown)
+    private var pollSkipsRemaining = 0
 
     private init() {}
 
@@ -135,6 +139,13 @@ class ClaudeOAuthUsageFetcher {
 
     /// Fetch usage from the OAuth API. Returns nil if no credentials or request fails.
     func fetchUsage() async -> OAuthUsageSnapshot? {
+        // Backoff: skip this poll if we're cooling down from a 429
+        if pollSkipsRemaining > 0 {
+            pollSkipsRemaining -= 1
+            print("[ClaudeOAuthUsageFetcher] Backing off (\(pollSkipsRemaining) skips remaining)")
+            return lastSnapshot
+        }
+
         guard let credentials = await getValidCredentials() else {
             print("[ClaudeOAuthUsageFetcher] No valid credentials available")
             return nil
@@ -158,6 +169,7 @@ class ClaudeOAuthUsageFetcher {
 
             switch httpResponse.statusCode {
             case 200:
+                pollSkipsRemaining = 0  // Reset backoff on success
                 let snapshot = parseResponse(data)
                 if snapshot != nil { lastSnapshot = snapshot }
                 return snapshot
@@ -174,8 +186,9 @@ class ClaudeOAuthUsageFetcher {
                 credentialStore.triggerCLIRefresh()
                 return nil
             case 429:
-                print("[ClaudeOAuthUsageFetcher] 429 Rate limited - trying to parse body, then cached data")
-                // Many APIs include usage data even in 429 responses
+                pollSkipsRemaining = 2  // Skip next 2 polls (~4 min cooldown)
+                print("[ClaudeOAuthUsageFetcher] 429 Rate limited - backing off for \(pollSkipsRemaining) polls, returning cached data")
+                // Try to parse body (some APIs include data in 429), otherwise use cache
                 if let snapshot = parseResponse(data) {
                     lastSnapshot = snapshot
                     return snapshot
@@ -263,14 +276,57 @@ class ClaudeOAuthUsageFetcher {
         }
     }
 
+    /// Normalizes a utilization value to integer percentage (0–100).
+    /// The API returns some windows as fractions (0–1) and others as percentages (0–100).
+    private func normalizeUtilization(_ value: Double) -> Int {
+        if value > 0 && value <= 1.0 {
+            return Int((value * 100).rounded())
+        }
+        return Int(value.rounded())
+    }
+
     private func parseResponse(_ data: Data) -> OAuthUsageSnapshot? {
+        // DIAGNOSTIC — write raw response to /tmp/oauth_debug.json
+        if let raw = String(data: data, encoding: .utf8) {
+            try? raw.write(toFile: "/tmp/oauth_debug.json", atomically: true, encoding: .utf8)
+        }
         do {
             let response = try JSONDecoder().decode(OAuthUsageResponse.self, from: data)
 
-            let sessionPercent = Int(response.fiveHour?.utilization ?? 0)
-            let weeklyAllPercent = Int(response.sevenDay?.utilization ?? 0)
-            let weeklySonnetPercent = response.sevenDaySonnet.map { Int($0.utilization) }
-            let weeklyOpusPercent = response.sevenDayOpus.map { Int($0.utilization) }
+            // Validate: at least one rate window must be present.
+            // Error responses (e.g. 429 body: {"error": {...}}) decode successfully
+            // with all-nil fields — treat those as invalid rather than 0% data.
+            guard response.fiveHour != nil
+               || response.sevenDay != nil
+               || response.sevenDaySonnet != nil
+               || response.sevenDayOpus != nil
+               || response.iguanaNecktie != nil else {
+                print("[ClaudeOAuthUsageFetcher] Response has no rate windows — likely an error body")
+                return nil
+            }
+
+            let fields = "[OAuth FIELDS] five_hour=\(response.fiveHour?.utilization as Any) seven_day=\(response.sevenDay?.utilization as Any) iguana_necktie=\(response.iguanaNecktie?.utilization as Any) sonnet=\(response.sevenDaySonnet?.utilization as Any) opus=\(response.sevenDayOpus?.utilization as Any) oauth_apps=\(response.sevenDayOauthApps?.utilization as Any)"
+            try? fields.write(toFile: "/tmp/oauth_fields.txt", atomically: true, encoding: .utf8)
+
+            var sessionPercent = normalizeUtilization(response.fiveHour?.utilization ?? 0)
+            var weeklyAllPercent = normalizeUtilization(response.sevenDay?.utilization ?? 0)
+            let weeklySonnetPercent = response.sevenDaySonnet.map { normalizeUtilization($0.utilization) }
+            let weeklyOpusPercent = response.sevenDayOpus.map { normalizeUtilization($0.utilization) }
+
+            // Incident detection: if aggregate fields (five_hour/seven_day) are 0 but
+            // model-specific fields have real data, the API is partially broken.
+            // Preserve cached values instead of overwriting with bogus zeros.
+            let hasModelData = (weeklySonnetPercent ?? 0) > 0 || (weeklyOpusPercent ?? 0) > 0
+            if hasModelData, let cached = lastSnapshot {
+                if sessionPercent == 0 && cached.sessionPercent > 0 {
+                    print("[ClaudeOAuthUsageFetcher] Preserving cached session=\(cached.sessionPercent)% (API returned 0 during incident)")
+                    sessionPercent = cached.sessionPercent
+                }
+                if weeklyAllPercent == 0 && cached.weeklyAllPercent > 0 {
+                    print("[ClaudeOAuthUsageFetcher] Preserving cached weekly=\(cached.weeklyAllPercent)% (API returned 0 during incident)")
+                    weeklyAllPercent = cached.weeklyAllPercent
+                }
+            }
 
             let extra = response.extraUsage
             let extraEnabled = extra?.isEnabled ?? false
