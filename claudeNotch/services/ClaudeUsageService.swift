@@ -93,6 +93,7 @@ class ClaudeUsageService: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var midnightTimer: Timer?
+    private var tokenRefreshTimer: Timer?
 
     // MARK: - Initialization
 
@@ -133,6 +134,7 @@ class ClaudeUsageService: ObservableObject {
         // Start file monitoring
         logMonitor.startMonitoring { [weak self] in
             self?.refreshCodeUsage()
+            self?.refreshTokenCache()
         }
 
         // Initial load of code usage
@@ -145,12 +147,11 @@ class ClaudeUsageService: ObservableObject {
         // Build/update the JSONL token cache in background.
         // First launch: parses all JSONL files (one-time, ~1-2 min).
         // Subsequent launches: only re-parses today's files (seconds).
-        let dir = parser.projectsPath
-        Task.detached(priority: .utility) {
-            let _ = await DailyTokenCache.shared.update(projectsDir: dir)
-            await MainActor.run {
-                NotificationCenter.default.post(name: .claudeUsageDataReceived, object: nil)
-            }
+        refreshTokenCache()
+
+        // Refresh token cache every 5 minutes to keep "Today" count fresh
+        tokenRefreshTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            self?.refreshTokenCache()
         }
 
         isInitialized = true
@@ -162,8 +163,22 @@ class ClaudeUsageService: ObservableObject {
         oauthFetcher.stopAutoRefresh()
         midnightTimer?.invalidate()
         midnightTimer = nil
+        tokenRefreshTimer?.invalidate()
+        tokenRefreshTimer = nil
         cancellables.removeAll()
         print("[ClaudeUsageService] Stopped")
+    }
+
+    // MARK: - Token Cache Refresh
+
+    private func refreshTokenCache() {
+        let dir = parser.projectsPath
+        Task.detached(priority: .utility) {
+            let _ = await DailyTokenCache.shared.update(projectsDir: dir)
+            await MainActor.run {
+                NotificationCenter.default.post(name: .claudeUsageDataReceived, object: nil)
+            }
+        }
     }
 
     // MARK: - Midnight Snapshot

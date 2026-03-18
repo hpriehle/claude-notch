@@ -11,12 +11,20 @@ import Defaults
 /// Compact view for the closed notch state showing key usage stats
 struct ClaudeCompactView: View {
     @EnvironmentObject var vm: ClaudeViewModel
+    @ObservedObject private var extraUsage = ExtraUsageService.shared
 
     @State private var displayedResetTime: String = ""
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: 8) {
+            // Extra usage indicator
+            if extraUsage.isExtraUsageActive {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.yellow)
+            }
+
             // Connection indicator dot
             Circle()
                 .fill(vm.usageData.isOAuthConnected ? Color.green : Color.gray.opacity(0.5))

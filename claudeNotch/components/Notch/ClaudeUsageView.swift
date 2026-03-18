@@ -13,6 +13,7 @@ import AppKit
 struct ClaudeUsageView: View {
     @EnvironmentObject var vm: ClaudeViewModel
     @ObservedObject private var usageService = ClaudeUsageService.shared
+    @ObservedObject private var extraUsage = ExtraUsageService.shared
 
     // Set to false to disable the history page entirely (safe kill switch)
     private static let historyPageEnabled = true
@@ -61,7 +62,7 @@ struct ClaudeUsageView: View {
     // MARK: - Page 0: existing usage content (unchanged logic)
 
     private var usagePage: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: extraUsage.isExtraUsageActive ? 8 : 12) {
             // Header
             HStack {
                 Image(systemName: "sparkles")
@@ -70,6 +71,21 @@ struct ClaudeUsageView: View {
                 Text("Claude Usage")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
+
+                if extraUsage.isExtraUsageActive {
+                    HStack(spacing: 3) {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 8))
+                        Text("2x")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.yellow)
+                    .cornerRadius(6)
+                }
+
                 Spacer()
 
                 // Refresh button
@@ -92,6 +108,11 @@ struct ClaudeUsageView: View {
                 )
             }
             .padding(.bottom, 4)
+
+            // Extra usage countdown
+            if extraUsage.isExtraUsageActive, let endsAt = extraUsage.extraUsageEndsAt {
+                ExtraUsageCountdownView(endsAt: endsAt)
+            }
 
             // Show loading only while the initial API call is in flight
             if usageService.isInitialFetchInProgress {
@@ -140,8 +161,8 @@ struct ClaudeUsageView: View {
             }
         }
         .padding(.horizontal, 28)  // Avoid corner clipping (corner radius is 24pt)
-        .padding(.top, 16)
-        .padding(.bottom, 28)
+        .padding(.top, extraUsage.isExtraUsageActive ? 12 : 16)
+        .padding(.bottom, extraUsage.isExtraUsageActive ? 20 : 28)
     }
 
     // MARK: - Page indicator dots
@@ -213,7 +234,7 @@ struct EmptyUsageView: View {
             Text("No usage data yet")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.gray)
-            Text("Connect via Settings → Claude, or use the browser extension")
+            Text("Connect via Settings → Claude")
                 .font(.system(size: 10))
                 .foregroundColor(.gray.opacity(0.7))
                 .multilineTextAlignment(.center)
@@ -351,16 +372,14 @@ struct ConnectionStatusView: View {
             .background(Color.white.opacity(0.05))
             .cornerRadius(8)
         } else {
-            // Not connected - show "Open Claude" button
+            // Not connected - open Settings to Claude section
             Button(action: {
-                if let url = URL(string: "https://claude.ai/settings/usage") {
-                    NSWorkspace.shared.open(url)
-                }
+                SettingsWindowController.shared.showWindow()
             }) {
                 HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.right.square")
+                    Image(systemName: "gear")
                         .font(.system(size: 9))
-                    Text("Open Claude")
+                    Text("Settings")
                         .font(.system(size: 9, weight: .medium))
                 }
                 .foregroundColor(.blue)
@@ -391,6 +410,46 @@ struct ConnectionIndicator: View {
         .padding(.vertical, 3)
         .background(Color.white.opacity(0.05))
         .cornerRadius(8)
+    }
+}
+
+/// Countdown showing when extra usage ends
+struct ExtraUsageCountdownView: View {
+    let endsAt: Date
+
+    @State private var displayText: String = ""
+    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 10))
+                .foregroundColor(.yellow)
+            Text("Extra usage ends in \(displayText)")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.yellow.opacity(0.9))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.yellow.opacity(0.1))
+        .cornerRadius(8)
+        .onAppear { updateText() }
+        .onReceive(timer) { _ in updateText() }
+    }
+
+    private func updateText() {
+        let interval = endsAt.timeIntervalSinceNow
+        guard interval > 0 else { displayText = "soon"; return }
+
+        let hours = Int(interval) / 3600
+        let minutes = (Int(interval) % 3600) / 60
+
+        if hours > 0 {
+            displayText = "\(hours)h \(minutes)m"
+        } else {
+            displayText = "\(minutes)m"
+        }
     }
 }
 

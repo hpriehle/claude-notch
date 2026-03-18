@@ -11,9 +11,17 @@ import SwiftUI
 struct SessionBarView: View {
     let percent: Int
     let color: Color
+    @ObservedObject private var extraUsage = ExtraUsageService.shared
 
     var body: some View {
         HStack(spacing: 6) {
+            // Extra usage indicator
+            if extraUsage.isExtraUsageActive {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.yellow)
+            }
+
             // Progress bar
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
