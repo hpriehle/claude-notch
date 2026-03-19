@@ -28,16 +28,7 @@ https://github.com/user-attachments/assets/cff88d74-8aeb-45f4-b82e-4e3fe1fd5f63
 
 ### Download
 
-Download the latest DMG from the [Releases page](https://github.com/hpriehle/claude-notch/releases/latest).
-
-> [!IMPORTANT]
-> ClaudeNotch is not signed with an Apple Developer certificate. On first launch:
-> 1. macOS will show a popup that the app is from an unidentified developer — click **OK**.
-> 2. Open **System Settings** > **Privacy & Security**.
-> 3. Scroll down and click **Open Anyway** next to the warning.
-> 4. Confirm your choice if prompted.
->
-> You only need to do this once.
+Download the latest DMG from the [Releases page](https://github.com/hpriehle/claude-notch/releases/latest), open it, and drag ClaudeNotch to your Applications folder.
 
 ### Build from Source
 
