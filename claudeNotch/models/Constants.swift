@@ -79,6 +79,7 @@ extension Defaults.Keys {
     static let didClearLegacyURLCacheV1 = Key<Bool>("didClearLegacyURLCache_v1", default: false)
 
     // MARK: Claude Usage
+    static let showSessionBar = Key<Bool>("showSessionBar", default: true)
     static let showSessionUsage = Key<Bool>("showSessionUsage", default: true)
     static let showWeeklyAllUsage = Key<Bool>("showWeeklyAllUsage", default: true)
     static let showWeeklySonnetUsage = Key<Bool>("showWeeklySonnetUsage", default: true)

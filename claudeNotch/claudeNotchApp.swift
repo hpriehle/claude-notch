@@ -17,6 +17,7 @@ import SwiftUI
 struct ClaudeNotchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Default(.menubarIcon) var showMenuBarIcon
+    @ObservedObject private var visibilityManager = NotchVisibilityManager.shared
     @Environment(\.openWindow) var openWindow
 
     let updaterController: SPUStandardUpdaterController
@@ -31,6 +32,12 @@ struct ClaudeNotchApp: App {
 
     var body: some Scene {
         MenuBarExtra("claude.notch", systemImage: "sparkles", isInserted: $showMenuBarIcon) {
+            if visibilityManager.isNotchHidden {
+                Button("Show Notch") {
+                    NotchVisibilityManager.shared.showNotch()
+                }
+                Divider()
+            }
             Button("Settings") {
                 SettingsWindowController.shared.showWindow()
             }
@@ -264,6 +271,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
         }
 
+        NotificationCenter.default.addObserver(
+            forName: .notchShouldHide, object: nil, queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.hideAllNotchWindows()
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: .notchShouldShow, object: nil, queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.showAllNotchWindows()
+            }
+        }
+
         KeyboardShortcuts.onKeyDown(for: .toggleNotchOpen) { [weak self] in
             Task { [weak self] in
                 guard let self = self else { return }
@@ -370,6 +393,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func adjustWindowPosition(changeAlpha: Bool = false) {
+        guard !NotchVisibilityManager.shared.isNotchHidden else { return }
+
         if Defaults[.showOnAllDisplays] {
             let currentScreenUUIDs = Set(NSScreen.screens.compactMap { $0.displayUUID })
 
@@ -437,6 +462,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @MainActor
+    private func hideAllNotchWindows() {
+        if Defaults[.showOnAllDisplays] {
+            windows.values.forEach { $0.orderOut(nil) }
+        } else {
+            window?.orderOut(nil)
+        }
+    }
+
+    @MainActor
+    private func showAllNotchWindows() {
+        if Defaults[.showOnAllDisplays] {
+            for (uuid, window) in windows {
+                if let screen = NSScreen.screen(withUUID: uuid) {
+                    positionWindow(window, on: screen)
+                }
+                window.orderFrontRegardless()
+            }
+        } else {
+            if let window = window {
+                window.orderFrontRegardless()
+                adjustWindowPosition()
+            }
+        }
+    }
+
     @objc func togglePopover(_ sender: Any?) {
         if window?.isVisible == true {
             window?.orderOut(nil)
@@ -495,6 +546,8 @@ extension Notification.Name {
     static let showOnAllDisplaysChanged = Notification.Name("showOnAllDisplaysChanged")
     static let automaticallySwitchDisplayChanged = Notification.Name("automaticallySwitchDisplayChanged")
     static let expandedDragDetectionChanged = Notification.Name("expandedDragDetectionChanged")
+    static let notchShouldHide = Notification.Name("notchShouldHide")
+    static let notchShouldShow = Notification.Name("notchShouldShow")
 }
 
 extension CGRect: @retroactive Hashable {

@@ -113,6 +113,7 @@
 		F1A2B3C4D5E6F7A8B9C0D1E2 /* DailyTokenCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* DailyTokenCache.swift */; };
 		F5591F425053E62E5B904C45 /* ExtraUsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E710C1144B013A67EA52A5 /* ExtraUsageService.swift */; };
 		FC49883DAC49AF22D50906F7 /* UsageNotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E2E222B1549749C9A4D87BA /* UsageNotificationManager.swift */; };
+		FD5A994EBC5AB03371E01708 /* NotchVisibilityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3F333C2659850D1B5E98CB /* NotchVisibilityManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -216,6 +217,7 @@
 		66CE5D4FE156490A9A14A176 /* ClaudeUsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageData.swift; sourceTree = "<group>"; };
 		6A6B52C490204855A1FE74A1 /* UsageHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageHistoryStore.swift; sourceTree = "<group>"; };
 		7E2E222B1549749C9A4D87BA /* UsageNotificationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UsageNotificationManager.swift; sourceTree = "<group>"; };
+		8F3F333C2659850D1B5E98CB /* NotchVisibilityManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotchVisibilityManager.swift; sourceTree = "<group>"; };
 		891928D537C3CFFD1555DEFA /* StatsDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StatsDetailView.swift; sourceTree = "<group>"; };
 		9A0887312C7A693000C160EA /* TabButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabButton.swift; sourceTree = "<group>"; };
 		9A0887342C7AFF8E00C160EA /* TabSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSelectionView.swift; sourceTree = "<group>"; };
@@ -692,6 +694,7 @@
 				EE607E20552D46EEA123BBBF /* HorizontalScrollPageDetector.swift */,
 				B0FE66EE798DF4953042FFBF /* ClaudeOAuthCredentialStore.swift */,
 				7E2E222B1549749C9A4D87BA /* UsageNotificationManager.swift */,
+				8F3F333C2659850D1B5E98CB /* NotchVisibilityManager.swift */,
 				F6E710C1144B013A67EA52A5 /* ExtraUsageService.swift */,
 			);
 			name = services;
@@ -928,6 +931,7 @@
 				A68E786AF3A2495A984C4AFA /* HorizontalScrollPageDetector.swift in Sources */,
 				1E7C3796ADCB4B179EB5873D /* UsageHistoryView.swift in Sources */,
 				FC49883DAC49AF22D50906F7 /* UsageNotificationManager.swift in Sources */,
+				FD5A994EBC5AB03371E01708 /* NotchVisibilityManager.swift in Sources */,
 				EADFB877C07DB99760FDB6D7 /* ContributionGridView.swift in Sources */,
 				012FF026545E7097C276AAF6 /* StatsDetailView.swift in Sources */,
 				F5591F425053E62E5B904C45 /* ExtraUsageService.swift in Sources */,

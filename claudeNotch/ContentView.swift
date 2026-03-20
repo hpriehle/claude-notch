@@ -146,12 +146,26 @@ struct ContentView: View {
                             SettingsWindowController.shared.showWindow()
                         }
                         .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
+
+                        Divider()
+
+                        Menu("Hide") {
+                            Button("Hide") {
+                                NotchVisibilityManager.shared.hideIndefinitely()
+                            }
+                            Button("Hide for 1 Hour") {
+                                NotchVisibilityManager.shared.hide(for: 3600)
+                            }
+                            Button("Hide till the Morning") {
+                                NotchVisibilityManager.shared.hideTillMorning()
+                            }
+                        }
                     }
 
                 // Session progress bar below notch (visible in closed state)
                 // Hide during initial load to avoid showing 0% before real data arrives
                 let effectiveSessionPercent = vm.usageData.oauthSessionPercent
-                if vm.notchState == .closed, !usageService.isInitialFetchInProgress, let sessionPercent = effectiveSessionPercent {
+                if vm.notchState == .closed, Defaults[.showSessionBar], !usageService.isInitialFetchInProgress, let sessionPercent = effectiveSessionPercent {
                     SessionBarView(percent: sessionPercent, color: vm.usageData.colorForPercent(sessionPercent))
                         .frame(width: vm.closedNotchSize.width)
                         .padding(.top, 2)

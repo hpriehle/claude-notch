@@ -12,6 +12,7 @@ import SwiftUI
 struct ClaudeHeader: View {
     @EnvironmentObject var vm: ClaudeViewModel
     @ObservedObject var coordinator = ClaudeViewCoordinator.shared
+    @Default(.showSessionBar) var showSessionBar
 
     var body: some View {
         HStack(spacing: 0) {
@@ -59,6 +60,21 @@ struct ClaudeHeader: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
+                        Button(action: {
+                            Defaults[.showSessionBar].toggle()
+                        }) {
+                            Capsule()
+                                .fill(.black)
+                                .frame(width: 30, height: 30)
+                                .overlay {
+                                    Image(systemName: showSessionBar ? "eye" : "eye.slash")
+                                        .foregroundColor(.white)
+                                        .padding()
+                                        .imageScale(.medium)
+                                }
+                        }
+                        .buttonStyle(PlainButtonStyle())
+
                         if Defaults[.settingsIconInNotch] {
                             Button(action: {
                                 SettingsWindowController.shared.showWindow()
