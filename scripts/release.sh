@@ -28,11 +28,11 @@ GITHUB_REPO="hpriehle/claude-notch"
 
 # Code signing — replace with your Developer ID values
 DEVELOPER_ID_IDENTITY="Developer ID Application"  # or full identity string
-DEVELOPMENT_TEAM=""  # Your Apple Team ID (e.g., "A1B2C3D4E5")
+DEVELOPMENT_TEAM="5473W6M839"  # Your Apple Team ID (e.g., "A1B2C3D4E5")
 
 # Notarization — replace with your Apple credentials
-APPLE_ID=""           # Your Apple ID email
-APPLE_TEAM_ID=""      # Same as DEVELOPMENT_TEAM
+APPLE_ID="hpriehle@gmail.com"           # Your Apple ID email
+APPLE_TEAM_ID="5473W6M839"      # Same as DEVELOPMENT_TEAM
 # Store the app-specific password in Keychain:
 #   xcrun notarytool store-credentials "notarytool-profile" \
 #     --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "your-app-specific-password"
@@ -86,6 +86,33 @@ APP_BUNDLE="$EXPORT_PATH/$APP_NAME.app"
 MARKETING_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_BUNDLE/Contents/Info.plist")
 BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$APP_BUNDLE/Contents/Info.plist")
 echo "    Version: $MARKETING_VERSION (build $BUILD_NUMBER)"
+
+# --- Step 2b: Deep re-sign embedded frameworks and XPC services ---
+echo "==> Deep re-signing app bundle..."
+SIGN_IDENTITY="$DEVELOPER_ID_IDENTITY: Harrison Riehle ($DEVELOPMENT_TEAM)"
+SIGN_FLAGS="--force --options runtime --timestamp --sign"
+
+# Sign Sparkle framework binaries
+find "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework" -type f -perm +111 \
+  ! -name "*.plist" ! -name "*.strings" | while read binary; do
+    codesign $SIGN_FLAGS "$SIGN_IDENTITY" "$binary"
+done
+
+# Sign Sparkle XPC services
+find "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework" -name "*.xpc" -type d | while read xpc; do
+    codesign $SIGN_FLAGS "$SIGN_IDENTITY" "$xpc"
+done
+
+# Sign the Sparkle framework itself
+codesign $SIGN_FLAGS "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+
+# Sign XPC Helper with hardened runtime
+codesign $SIGN_FLAGS "$SIGN_IDENTITY" "$APP_BUNDLE/Contents/XPCServices/ClaudeNotchXPCHelper.xpc"
+
+# Re-sign the main app bundle
+codesign $SIGN_FLAGS "$SIGN_IDENTITY" "$APP_BUNDLE"
+
+echo "    Re-signing complete."
 
 # --- Step 3: Notarize ---
 echo "==> Creating ZIP for notarization..."

@@ -1,22 +1,30 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
-  <channel>
-    <title>ClaudeNotch</title>
-    <link>https://hpriehle.github.io/claude-notch/appcast.xml</link>
-    <item>
-      <title>ClaudeNotch 1.0.1</title>
-      <pubDate>Wed, 18 Mar 2026 17:05:05 -0400</pubDate>
-      <sparkle:version>2</sparkle:version>
-      <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-      <description><![CDATA[
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>ClaudeNotch</title>
+        <link>https://hpriehle.github.io/claude-notch/appcast.xml</link>
+        <item>
+            <title>1.0.2</title>
+            <pubDate>Fri, 20 Mar 2026 03:32:06 -0400</pubDate>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/hpriehle/claude-notch/releases/download/v1.0.2/ClaudeNotch.dmg" length="6736952" type="application/octet-stream" sparkle:edSignature="EVZ1Dx5CFewGXC9sMCFMEJQnFO8Pgosayr/BRECYhtKkBO5m6Fjum6N8SPuVm+khkVdEfWQUxyYzJJJSdByRDg=="/>
+        </item>
+        <item>
+            <title>ClaudeNotch 1.0.1</title>
+            <pubDate>Wed, 18 Mar 2026 17:05:05 -0400</pubDate>
+            <sparkle:version>2</sparkle:version>
+            <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[
         <h2>What's New in 1.0.1</h2>
         <ul>
           <li>Extra Usage Promotion tracking</li>
           <li>Fixed daily token cache accuracy</li>
         </ul>
       ]]></description>
-      <enclosure url="https://github.com/hpriehle/claude-notch/releases/download/v1.0.1/ClaudeNotch.dmg" length="7061878" type="application/octet-stream" sparkle:edSignature="J/z0hAS5sEJ4qqqqi/GgUDEERCKhYyc6c9VhmwwKDNevNb2BeJYUxz/l6LgYJsvxGPY/84wFzbErXO/OvL6nBA=="/>
-    </item>
-  </channel>
+            <enclosure url="https://github.com/hpriehle/claude-notch/releases/download/v1.0.1/ClaudeNotch.dmg" length="7061878" type="application/octet-stream" sparkle:edSignature="J/z0hAS5sEJ4qqqqi/GgUDEERCKhYyc6c9VhmwwKDNevNb2BeJYUxz/l6LgYJsvxGPY/84wFzbErXO/OvL6nBA=="/>
+        </item>
+    </channel>
 </rss>
