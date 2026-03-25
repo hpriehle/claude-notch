@@ -120,10 +120,15 @@ class ClaudeUsageService: ObservableObject {
                 onInitialFetchComplete: { [weak self] in
                     guard let self = self else { return }
                     self.isInitialFetchInProgress = false
-                    // If we never got data, credentials were bad — show disconnected, not loading
+                    // If we never got data, show the error but stay "connected" as long as credentials exist
                     if !self.currentUsage.hasOAuthData {
-                        self.hasOAuthData = false
-                        print("[ClaudeUsageService] Initial fetch failed — marking as disconnected")
+                        if self.oauthFetcher.isConfigured {
+                            self.lastRefreshError = self.oauthFetcher.lastError ?? "Failed to fetch usage data."
+                            print("[ClaudeUsageService] Initial fetch failed but credentials exist — showing error")
+                        } else {
+                            self.hasOAuthData = false
+                            print("[ClaudeUsageService] Initial fetch failed, no credentials — marking as disconnected")
+                        }
                     }
                 }
             )
@@ -221,11 +226,11 @@ class ClaudeUsageService: ObservableObject {
             await MainActor.run {
                 if let snapshot = snapshot {
                     self.handleOAuthUsageData(snapshot)
-                    self.lastRefreshError = nil
+                    self.lastRefreshError = self.oauthFetcher.lastError
                     print("[ClaudeUsageService] refresh() succeeded - session=\(snapshot.sessionPercent)%, weekly=\(snapshot.weeklyAllPercent)%")
                 } else {
-                    self.lastRefreshError = "Failed to fetch usage data. Check that `claude /login` has been run."
-                    print("[ClaudeUsageService] refresh() failed - fetchUsage returned nil")
+                    self.lastRefreshError = self.oauthFetcher.lastError ?? "Failed to fetch usage data."
+                    print("[ClaudeUsageService] refresh() failed - \(self.lastRefreshError ?? "unknown error")")
                 }
                 self.isRefreshing = false
             }
@@ -305,70 +310,72 @@ class ClaudeUsageService: ObservableObject {
     private func updateUsageData(codeUsage: CalculatedUsage? = nil, oauthUsage: OAuthUsageSnapshot? = nil) {
         print("[ClaudeUsageService \(ts())] updateUsageData called - codeUsage: \(codeUsage != nil), oauthUsage: \(oauthUsage != nil)")
 
-        var updatedUsage = currentUsage
-        var hasChanges = false
+        // Must read and write currentUsage on the main thread to avoid races
+        // where concurrent updates each capture a stale snapshot and overwrite each other.
+        let applyUpdate = {
+            var updatedUsage = self.currentUsage
+            var hasChanges = false
 
-        // Update code usage fields
-        if let code = codeUsage {
-            // Only mark as changed if values actually differ
-            let newSonnetTokens = Int(code.sonnetHours * Double(UsageCalculator.tokensPerHour["sonnet"] ?? 50_000))
-            let newOpusTokens = Int(code.opusHours * Double(UsageCalculator.tokensPerHour["opus"] ?? 30_000))
+            // Update code usage fields
+            if let code = codeUsage {
+                let newSonnetTokens = Int(code.sonnetHours * Double(UsageCalculator.tokensPerHour["sonnet"] ?? 50_000))
+                let newOpusTokens = Int(code.opusHours * Double(UsageCalculator.tokensPerHour["opus"] ?? 30_000))
 
-            if updatedUsage.codeWeeklyTokens != code.weeklyTokens
-                || updatedUsage.codeTodayTokens != code.todayTokens
-                || updatedUsage.codeSonnetTokens != newSonnetTokens
-                || updatedUsage.codeOpusTokens != newOpusTokens {
+                if updatedUsage.codeWeeklyTokens != code.weeklyTokens
+                    || updatedUsage.codeTodayTokens != code.todayTokens
+                    || updatedUsage.codeSonnetTokens != newSonnetTokens
+                    || updatedUsage.codeOpusTokens != newOpusTokens {
 
-                updatedUsage.codeWeeklyTokens = code.weeklyTokens
-                updatedUsage.codeTodayTokens = code.todayTokens
-                updatedUsage.codeSonnetTokens = newSonnetTokens
-                updatedUsage.codeOpusTokens = newOpusTokens
-                hasChanges = true
-                print("[ClaudeUsageService \(ts())] Code data changed - weeklyTokens: \(code.weeklyTokens)")
+                    updatedUsage.codeWeeklyTokens = code.weeklyTokens
+                    updatedUsage.codeTodayTokens = code.todayTokens
+                    updatedUsage.codeSonnetTokens = newSonnetTokens
+                    updatedUsage.codeOpusTokens = newOpusTokens
+                    hasChanges = true
+                    print("[ClaudeUsageService \(self.ts())] Code data changed - weeklyTokens: \(code.weeklyTokens)")
+                }
+                self.hasCodeData = code.hasData
             }
-            hasCodeData = code.hasData
-        }
 
-        // Update OAuth usage fields
-        if let oauth = oauthUsage {
-            updatedUsage.oauthSessionPercent = oauth.sessionPercent
-            updatedUsage.oauthWeeklyAllPercent = oauth.weeklyAllPercent
-            updatedUsage.oauthWeeklySonnetPercent = oauth.weeklySonnetPercent
-            updatedUsage.oauthWeeklyOpusPercent = oauth.weeklyOpusPercent
-            updatedUsage.oauthSessionResetTime = oauth.sessionResetTime
-            updatedUsage.oauthWeeklyAllResetTime = oauth.weeklyAllResetTime
-            updatedUsage.oauthWeeklySonnetResetTime = oauth.weeklySonnetResetTime
-            updatedUsage.oauthExtraUsageEnabled = oauth.extraUsageEnabled
-            updatedUsage.oauthExtraUsageLimitDollars = oauth.extraUsageLimitDollars
-            updatedUsage.oauthExtraUsageUsedDollars = oauth.extraUsageUsedDollars
-            updatedUsage.oauthExtraUsagePercent = oauth.extraUsagePercent
-            updatedUsage.isOAuthConnected = true
-            hasOAuthData = true
-            hasChanges = true
-            print("[ClaudeUsageService \(ts())] OAuth data updated - session=\(oauth.sessionPercent)%, weekly=\(oauth.weeklyAllPercent)%")
-        }
+            // Update OAuth usage fields
+            if let oauth = oauthUsage {
+                updatedUsage.oauthSessionPercent = oauth.sessionPercent
+                updatedUsage.oauthWeeklyAllPercent = oauth.weeklyAllPercent
+                updatedUsage.oauthWeeklySonnetPercent = oauth.weeklySonnetPercent
+                updatedUsage.oauthWeeklyOpusPercent = oauth.weeklyOpusPercent
+                updatedUsage.oauthSessionResetTime = oauth.sessionResetTime
+                updatedUsage.oauthWeeklyAllResetTime = oauth.weeklyAllResetTime
+                updatedUsage.oauthWeeklySonnetResetTime = oauth.weeklySonnetResetTime
+                updatedUsage.oauthExtraUsageEnabled = oauth.extraUsageEnabled
+                updatedUsage.oauthExtraUsageLimitDollars = oauth.extraUsageLimitDollars
+                updatedUsage.oauthExtraUsageUsedDollars = oauth.extraUsageUsedDollars
+                updatedUsage.oauthExtraUsagePercent = oauth.extraUsagePercent
+                updatedUsage.isOAuthConnected = true
+                self.hasOAuthData = true
+                hasChanges = true
+                print("[ClaudeUsageService \(self.ts())] OAuth data updated - session=\(oauth.sessionPercent)%, weekly=\(oauth.weeklyAllPercent)%")
+            }
 
-        // Skip posting if nothing changed (prevents stale code-only updates from clobbering fresh web data)
-        guard hasChanges else {
-            print("[ClaudeUsageService \(ts())] No changes detected, skipping notification")
-            return
-        }
+            guard hasChanges else {
+                print("[ClaudeUsageService \(self.ts())] No changes detected, skipping notification")
+                return
+            }
 
-        // NOTE: Code data only has token counts, not actual rate limit percentages.
-        // Percentage bars require OAuth API connection.
+            updatedUsage.lastUpdated = Date()
 
-        updatedUsage.lastUpdated = Date()
+            print("[ClaudeUsageService \(self.ts())] STORING: session=\(updatedUsage.oauthSessionPercent ?? -1)%, weekly=\(updatedUsage.oauthWeeklyAllPercent ?? -1)%")
 
-        print("[ClaudeUsageService \(ts())] STORING: session=\(updatedUsage.oauthSessionPercent ?? -1)%, weekly=\(updatedUsage.oauthWeeklyAllPercent ?? -1)%")
-
-        // Update on main thread
-        DispatchQueue.main.async {
             self.currentUsage = updatedUsage
             self.updatePredictions(from: updatedUsage)
             self.postNotification()
             UsageHistoryStore.shared.record(self.currentUsage)
             NotificationCenter.default.post(name: .usageHistoryUpdated, object: nil)
             print("[ClaudeUsageService \(self.ts())] POSTED: session=\(self.currentUsage.oauthSessionPercent ?? -1)%, weekly=\(self.currentUsage.oauthWeeklyAllPercent ?? -1)%")
+        }
+
+        if Thread.isMainThread {
+            applyUpdate()
+        } else {
+            DispatchQueue.main.async(execute: applyUpdate)
         }
     }
 

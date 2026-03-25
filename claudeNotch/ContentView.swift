@@ -166,7 +166,7 @@ struct ContentView: View {
                 // Hide during initial load to avoid showing 0% before real data arrives
                 let effectiveSessionPercent = vm.usageData.oauthSessionPercent
                 if vm.notchState == .closed, Defaults[.showSessionBar], !usageService.isInitialFetchInProgress, let sessionPercent = effectiveSessionPercent {
-                    SessionBarView(percent: sessionPercent, color: vm.usageData.colorForPercent(sessionPercent))
+                    SessionBarView(percent: sessionPercent, color: vm.usageData.colorForPercent(sessionPercent), hasWarning: usageService.lastRefreshError != nil)
                         .frame(width: vm.closedNotchSize.width)
                         .padding(.top, 2)
                         .onTapGesture {

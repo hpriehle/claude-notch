@@ -11,12 +11,17 @@ import SwiftUI
 struct SessionBarView: View {
     let percent: Int
     let color: Color
+    var hasWarning: Bool = false
     @ObservedObject private var extraUsage = ExtraUsageService.shared
 
     var body: some View {
         HStack(spacing: 6) {
-            // Extra usage indicator
-            if extraUsage.isExtraUsageActive {
+            // Warning indicator (takes priority over extra usage icon)
+            if hasWarning {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.orange)
+            } else if extraUsage.isExtraUsageActive {
                 Image(systemName: "bolt.fill")
                     .font(.system(size: 9, weight: .bold))
                     .foregroundColor(.yellow)

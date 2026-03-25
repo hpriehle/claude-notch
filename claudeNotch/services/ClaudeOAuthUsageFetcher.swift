@@ -132,6 +132,8 @@ class ClaudeOAuthUsageFetcher {
     private var lastSnapshot: OAuthUsageSnapshot?
     /// Skip counter for 429 backoff — each 429 sets this to 2, skipping 2 polls (~4 min cooldown)
     private var pollSkipsRemaining = 0
+    /// Human-readable error from the last fetch attempt (nil on success)
+    private(set) var lastError: String?
 
     private init() {}
 
@@ -148,6 +150,7 @@ class ClaudeOAuthUsageFetcher {
 
         guard let credentials = await getValidCredentials() else {
             print("[ClaudeOAuthUsageFetcher] No valid credentials available")
+            lastError = "No valid credentials available"
             return nil
         }
 
@@ -170,6 +173,7 @@ class ClaudeOAuthUsageFetcher {
             switch httpResponse.statusCode {
             case 200:
                 pollSkipsRemaining = 0  // Reset backoff on success
+                lastError = nil
                 let snapshot = parseResponse(data)
                 if snapshot != nil { lastSnapshot = snapshot }
                 return snapshot
@@ -184,23 +188,32 @@ class ClaudeOAuthUsageFetcher {
                 }
                 // Fallback: trigger CLI refresh
                 credentialStore.triggerCLIRefresh()
+                lastError = "401 Unauthorized — token refresh failed. Try running `claude /login` again."
                 return nil
             case 429:
                 pollSkipsRemaining = 2  // Skip next 2 polls (~4 min cooldown)
-                print("[ClaudeOAuthUsageFetcher] 429 Rate limited - backing off for \(pollSkipsRemaining) polls, returning cached data")
+                print("[ClaudeOAuthUsageFetcher] 429 Rate limited - backing off for \(pollSkipsRemaining) polls")
                 // Try to parse body (some APIs include data in 429), otherwise use cache
                 if let snapshot = parseResponse(data) {
                     lastSnapshot = snapshot
+                    lastError = "429 Rate limited — backing off, using cached data"
                     return snapshot
                 }
-                return lastSnapshot
+                if let cached = lastSnapshot {
+                    lastError = "429 Rate limited — backing off, using cached data"
+                    return cached
+                }
+                lastError = "429 Rate limited — backing off, no cached data available"
+                return nil
             default:
                 let body = String(data: data, encoding: .utf8) ?? "<no body>"
                 print("[ClaudeOAuthUsageFetcher] HTTP \(httpResponse.statusCode): \(body)")
+                lastError = "HTTP \(httpResponse.statusCode)"
                 return lastSnapshot
             }
         } catch {
             print("[ClaudeOAuthUsageFetcher] Request error: \(error)")
+            lastError = "Network error: \(error.localizedDescription)"
             return nil
         }
     }
