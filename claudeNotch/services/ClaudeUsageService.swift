@@ -302,6 +302,7 @@ class ClaudeUsageService: ObservableObject {
 
     private func handleOAuthUsageData(_ snapshot: OAuthUsageSnapshot) {
         print("[ClaudeUsageService \(ts())] OAUTH RECEIVED: session=\(snapshot.sessionPercent)%, weekly=\(snapshot.weeklyAllPercent)%")
+        lastRefreshError = oauthFetcher.lastError
         updateUsageData(oauthUsage: snapshot)
     }
 
