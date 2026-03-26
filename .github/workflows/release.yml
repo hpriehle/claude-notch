@@ -69,6 +69,37 @@ jobs:
           echo "build_number=$BUILD" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION (build $BUILD)"
 
+      - name: Deep re-sign app bundle
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP="build/Release/claudeNotch.app"
+          IDENTITY="Developer ID Application: Harrison Riehle ($DEVELOPMENT_TEAM)"
+          SIGN="codesign --force --options runtime --timestamp --sign"
+
+          # Re-sign all Sparkle framework executables
+          find "$APP/Contents/Frameworks/Sparkle.framework" -type f -perm +111 \
+            ! -name "*.plist" ! -name "*.strings" | while read binary; do
+              $SIGN "$IDENTITY" "$binary"
+          done
+
+          # Re-sign Sparkle XPC services
+          find "$APP/Contents/Frameworks/Sparkle.framework" -name "*.xpc" -type d | while read xpc; do
+              $SIGN "$IDENTITY" "$xpc"
+          done
+
+          # Re-sign Sparkle framework bundle
+          $SIGN "$IDENTITY" "$APP/Contents/Frameworks/Sparkle.framework"
+
+          # Re-sign XPC Helper with hardened runtime
+          $SIGN "$IDENTITY" "$APP/Contents/XPCServices/ClaudeNotchXPCHelper.xpc"
+
+          # Re-sign main app bundle
+          $SIGN "$IDENTITY" "$APP"
+
+          echo "Deep re-signing complete"
+          codesign --verify --deep --strict "$APP"
+
       - name: Notarize
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
