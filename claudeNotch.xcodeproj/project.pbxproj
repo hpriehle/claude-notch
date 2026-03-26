@@ -68,6 +68,7 @@
 		14FC6E502C7DED5600C7BEA5 /* DataTypes+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FC6E4F2C7DED5600C7BEA5 /* DataTypes+Extensions.swift */; };
 		1806B6EA5787EDCD00469329 /* JSONLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372084FBE13A6AAE84F45EAC /* JSONLParser.swift */; };
 		1E7C3796ADCB4B179EB5873D /* UsageHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5A848E19B3B46D49A376A95 /* UsageHistoryView.swift */; };
+		2314D9EFB4FB72F2062598FA /* ClaudeStatusService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 350E5127D0BF6CBA5C2ED064 /* ClaudeStatusService.swift */; };
 		245A4418DD1EDD0EC7C1C4A1 /* ClaudeUsageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0847197D491BCD6ED3B8B4F /* ClaudeUsageService.swift */; };
 		3B81628BD6F248798055A619 /* ClaudeUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2935107D0F8E40A895E17045 /* ClaudeUsageView.swift */; };
 		507266DB2C908E2E00A2D00D /* HoverButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 507266DA2C908E2E00A2D00D /* HoverButton.swift */; };
@@ -108,6 +109,7 @@
 		B1F747F92EC7E94000F841DB /* LottieView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F747F82EC7E94000F841DB /* LottieView.swift */; };
 		B1FEB4992C7686630066EBBC /* PanGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1FEB4982C7686630066EBBC /* PanGesture.swift */; };
 		B60DC96F8A6914D88D751DE6 /* ClaudeOAuthUsageFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1B95F53EE87654F2135B57 /* ClaudeOAuthUsageFetcher.swift */; };
+		BEBF386DC68BCE8EE30F5FE2 /* ClaudeServiceStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C417BC7F0DA01789F3ECB32 /* ClaudeServiceStatus.swift */; };
 		EADFB877C07DB99760FDB6D7 /* ContributionGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51D0862F5B0C95629FC905FA /* ContributionGridView.swift */; };
 		EC5D730E767F88F6BA33ED17 /* UsageCalculator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B27F82BDE2752E49AC76B1F /* UsageCalculator.swift */; };
 		F1A2B3C4D5E6F7A8B9C0D1E2 /* DailyTokenCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* DailyTokenCache.swift */; };
@@ -208,7 +210,9 @@
 		14FC6E4F2C7DED5600C7BEA5 /* DataTypes+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DataTypes+Extensions.swift"; sourceTree = "<group>"; };
 		2935107D0F8E40A895E17045 /* ClaudeUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageView.swift; sourceTree = "<group>"; };
 		32A89ECB6D20447780D58AB6 /* ClaudeCompactView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCompactView.swift; sourceTree = "<group>"; };
+		350E5127D0BF6CBA5C2ED064 /* ClaudeStatusService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClaudeStatusService.swift; sourceTree = "<group>"; };
 		372084FBE13A6AAE84F45EAC /* JSONLParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JSONLParser.swift; sourceTree = "<group>"; };
+		3C417BC7F0DA01789F3ECB32 /* ClaudeServiceStatus.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClaudeServiceStatus.swift; sourceTree = "<group>"; };
 		507266DA2C908E2E00A2D00D /* HoverButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoverButton.swift; sourceTree = "<group>"; };
 		51D0862F5B0C95629FC905FA /* ContributionGridView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContributionGridView.swift; sourceTree = "<group>"; };
 		5955950C2E900ED800C66711 /* ApplicationRelauncher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationRelauncher.swift; sourceTree = "<group>"; };
@@ -217,8 +221,8 @@
 		66CE5D4FE156490A9A14A176 /* ClaudeUsageData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeUsageData.swift; sourceTree = "<group>"; };
 		6A6B52C490204855A1FE74A1 /* UsageHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageHistoryStore.swift; sourceTree = "<group>"; };
 		7E2E222B1549749C9A4D87BA /* UsageNotificationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UsageNotificationManager.swift; sourceTree = "<group>"; };
-		8F3F333C2659850D1B5E98CB /* NotchVisibilityManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotchVisibilityManager.swift; sourceTree = "<group>"; };
 		891928D537C3CFFD1555DEFA /* StatsDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StatsDetailView.swift; sourceTree = "<group>"; };
+		8F3F333C2659850D1B5E98CB /* NotchVisibilityManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotchVisibilityManager.swift; sourceTree = "<group>"; };
 		9A0887312C7A693000C160EA /* TabButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabButton.swift; sourceTree = "<group>"; };
 		9A0887342C7AFF8E00C160EA /* TabSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabSelectionView.swift; sourceTree = "<group>"; };
 		9F1B95F53EE87654F2135B57 /* ClaudeOAuthUsageFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthUsageFetcher.swift; sourceTree = "<group>"; };
@@ -549,6 +553,7 @@
 				B19016232CC15B4D00E3F12E /* Constants.swift */,
 				14D570C82C5F38890011E668 /* ClaudeViewModel.swift */,
 				66CE5D4FE156490A9A14A176 /* ClaudeUsageData.swift */,
+				3C417BC7F0DA01789F3ECB32 /* ClaudeServiceStatus.swift */,
 			);
 			path = models;
 			sourceTree = "<group>";
@@ -696,6 +701,7 @@
 				7E2E222B1549749C9A4D87BA /* UsageNotificationManager.swift */,
 				8F3F333C2659850D1B5E98CB /* NotchVisibilityManager.swift */,
 				F6E710C1144B013A67EA52A5 /* ExtraUsageService.swift */,
+				350E5127D0BF6CBA5C2ED064 /* ClaudeStatusService.swift */,
 			);
 			name = services;
 			path = services;
@@ -935,6 +941,8 @@
 				EADFB877C07DB99760FDB6D7 /* ContributionGridView.swift in Sources */,
 				012FF026545E7097C276AAF6 /* StatsDetailView.swift in Sources */,
 				F5591F425053E62E5B904C45 /* ExtraUsageService.swift in Sources */,
+				BEBF386DC68BCE8EE30F5FE2 /* ClaudeServiceStatus.swift in Sources */,
+				2314D9EFB4FB72F2062598FA /* ClaudeStatusService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -957,14 +965,14 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ClaudeNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ClaudeNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.harrison.claudenotch.ClaudeNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -982,14 +990,14 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = ClaudeNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = ClaudeNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.harrison.claudenotch.ClaudeNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1136,7 +1144,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"claudeNotch/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
@@ -1160,7 +1168,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.harrison.claudenotch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1187,7 +1195,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"claudeNotch/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
@@ -1210,7 +1218,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.harrison.claudenotch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

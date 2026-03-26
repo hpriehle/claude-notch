@@ -707,6 +707,21 @@ struct ClaudeSettings: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section {
+                Defaults.Toggle(key: .showServiceStatusIndicator) {
+                    Text("Show service status indicator")
+                }
+                Defaults.Toggle(key: .enableServiceStatusNotifications) {
+                    Text("Notify on service issues")
+                }
+            } header: {
+                Text("Service Status")
+            } footer: {
+                Text("Monitor Claude API and Claude Code health from status.claude.com")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
         }
         .accentColor(.effectiveAccent)
         .navigationTitle("Claude")

@@ -14,12 +14,14 @@ struct ClaudeUsageView: View {
     @EnvironmentObject var vm: ClaudeViewModel
     @ObservedObject private var usageService = ClaudeUsageService.shared
     @ObservedObject private var extraUsage = ExtraUsageService.shared
+    @ObservedObject private var statusService = ClaudeStatusService.shared
 
     // Set to false to disable the history page entirely (safe kill switch)
     private static let historyPageEnabled = true
     private let pageCount = 2
 
     @State private var selectedPage: Int = 0
+    @State private var isStatusHovered: Bool = false
     private let pageDetector = HorizontalScrollPageDetector()
 
     var body: some View {
@@ -65,9 +67,23 @@ struct ClaudeUsageView: View {
         VStack(alignment: .leading, spacing: extraUsage.isExtraUsageActive ? 8 : 12) {
             // Header
             HStack {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(statusService.currentStatus.worstRelevantStatus != .unknown
+                            ? statusService.currentStatus.worstRelevantStatus.color
+                            : .green)
+                        .frame(width: 8, height: 8)
+                    if isStatusHovered {
+                        Text("Claude Status: \(statusService.currentStatus.worstRelevantStatus.label)")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(statusService.currentStatus.worstRelevantStatus != .unknown
+                                ? statusService.currentStatus.worstRelevantStatus.color
+                                : .green)
+                            .transition(.opacity)
+                    }
+                }
+                .onHover { isStatusHovered = $0 }
+                .animation(.easeInOut(duration: 0.15), value: isStatusHovered)
                 Text("Claude Usage")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
@@ -101,6 +117,7 @@ struct ClaudeUsageView: View {
                 .buttonStyle(.plain)
                 .disabled(usageService.isRefreshing)
                 .help("Refresh usage data")
+
 
                 ConnectionStatusView(
                     isConnected: vm.usageData.isOAuthConnected,
@@ -333,6 +350,36 @@ struct UsageBarView: View {
         }
         .onReceive(timer) { _ in
             displayedResetTime = ClaudeUsageData.formatResetTime(resetTime)
+        }
+    }
+}
+
+/// Service status badge — shows Claude API & Code health from status.claude.com
+struct ServiceStatusBadgeView: View {
+    @ObservedObject private var statusService = ClaudeStatusService.shared
+
+    var body: some View {
+        if statusService.isLoaded, statusService.currentStatus.worstRelevantStatus != .unknown {
+            Button(action: {
+                NSWorkspace.shared.open(statusService.currentStatus.statusPageURL)
+            }) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(statusService.currentStatus.worstRelevantStatus.color)
+                        .frame(width: 6, height: 6)
+                    if statusService.currentStatus.hasIssue {
+                        Text(statusService.currentStatus.worstRelevantStatus.label)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(statusService.currentStatus.worstRelevantStatus.color)
+                    }
+                }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+            .help("Claude service status — click to open status page")
         }
     }
 }

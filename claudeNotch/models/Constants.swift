@@ -89,4 +89,8 @@ extension Defaults.Keys {
     // MARK: Usage Notifications
     static let enableUsageNotifications = Key<Bool>("enableUsageNotifications", default: true)
     static let usageNotificationThresholds = Key<[Int]>("usageNotificationThresholds", default: [90, 95, 99])
+
+    // MARK: Service Status
+    static let showServiceStatusIndicator = Key<Bool>("showServiceStatusIndicator", default: true)
+    static let enableServiceStatusNotifications = Key<Bool>("enableServiceStatusNotifications", default: true)
 }
