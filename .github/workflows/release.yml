@@ -161,8 +161,8 @@ jobs:
           fi
 
           echo "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle_key"
-          SPARKLE_KEY_FILE="$RUNNER_TEMP/sparkle_key" \
           ./Configuration/sparkle/bin/generate_appcast appcast_staging \
+            --ed-key-file "$RUNNER_TEMP/sparkle_key" \
             --download-url-prefix "https://github.com/hpriehle/claude-notch/releases/download/${GITHUB_REF_NAME}/"
           rm -f "$RUNNER_TEMP/sparkle_key"
 
