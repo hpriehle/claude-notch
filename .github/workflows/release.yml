@@ -77,11 +77,25 @@ jobs:
         run: |
           ditto -c -k --keepParent "build/Release/claudeNotch.app" build/ClaudeNotch-notarize.zip
 
-          xcrun notarytool submit build/ClaudeNotch-notarize.zip \
+          SUBMIT_OUTPUT=$(xcrun notarytool submit build/ClaudeNotch-notarize.zip \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_ID_PASSWORD" \
-            --wait
+            --wait 2>&1) || true
+
+          echo "$SUBMIT_OUTPUT"
+          SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | grep -m1 'id:' | awk '{print $NF}')
+
+          STATUS=$(echo "$SUBMIT_OUTPUT" | grep -i 'status:' | tail -1 | awk '{print $NF}')
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::error::Notarization failed with status: $STATUS"
+            echo "--- Fetching notarization log ---"
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_ID_PASSWORD" || true
+            exit 1
+          fi
 
           xcrun stapler staple "build/Release/claudeNotch.app"
 
