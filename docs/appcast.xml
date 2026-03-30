@@ -9,7 +9,7 @@
             <sparkle:version>4</sparkle:version>
             <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/hpriehle/claude-notch/releases/download/v1.0.3/ClaudeNotch.dmg" length="6095779" type="application/octet-stream" sparkle:edSignature="byfTw+1F+7JoH6RDz9AnKDEuOaBChkeaplYmge/V+4Z1ubBkRjbB/R4CSw6GxZkdeHfuWIj7zaaE5V4+uNqxBw=="/>
+            <enclosure url="https://github.com/hpriehle/claude-notch/releases/download/v1.0.3/ClaudeNotch.dmg" length="6095848" type="application/octet-stream" sparkle:edSignature="QzAetKEFRUaSPUvv3cLTGqdldhLw2RoeRkcw4HylTQWb7+wTjEeEl2C7Q5ychs5GDwEbkfAHFDV9nWKROvQzBw=="/>
         </item>
         <item>
             <title>1.0.2</title>
