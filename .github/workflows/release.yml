@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+        run: sudo xcode-select -s /Applications/Xcode_16.3.app
 
       - name: Install certificate
         env:
@@ -69,6 +69,37 @@ jobs:
           echo "build_number=$BUILD" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION (build $BUILD)"
 
+      - name: Deep re-sign app bundle
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP="build/Release/claudeNotch.app"
+          IDENTITY="Developer ID Application: Harrison Riehle ($DEVELOPMENT_TEAM)"
+          SIGN="codesign --force --options runtime --timestamp --sign"
+
+          # Re-sign all Sparkle framework executables
+          find "$APP/Contents/Frameworks/Sparkle.framework" -type f -perm +111 \
+            ! -name "*.plist" ! -name "*.strings" | while read binary; do
+              $SIGN "$IDENTITY" "$binary"
+          done
+
+          # Re-sign Sparkle XPC services
+          find "$APP/Contents/Frameworks/Sparkle.framework" -name "*.xpc" -type d | while read xpc; do
+              $SIGN "$IDENTITY" "$xpc"
+          done
+
+          # Re-sign Sparkle framework bundle
+          $SIGN "$IDENTITY" "$APP/Contents/Frameworks/Sparkle.framework"
+
+          # Re-sign XPC Helper with hardened runtime
+          $SIGN "$IDENTITY" "$APP/Contents/XPCServices/ClaudeNotchXPCHelper.xpc"
+
+          # Re-sign main app bundle
+          $SIGN "$IDENTITY" "$APP"
+
+          echo "Deep re-signing complete"
+          codesign --verify --deep --strict "$APP"
+
       - name: Notarize
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -77,11 +108,25 @@ jobs:
         run: |
           ditto -c -k --keepParent "build/Release/claudeNotch.app" build/ClaudeNotch-notarize.zip
 
-          xcrun notarytool submit build/ClaudeNotch-notarize.zip \
+          SUBMIT_OUTPUT=$(xcrun notarytool submit build/ClaudeNotch-notarize.zip \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_ID_PASSWORD" \
-            --wait
+            --wait 2>&1) || true
+
+          echo "$SUBMIT_OUTPUT"
+          SUBMISSION_ID=$(echo "$SUBMIT_OUTPUT" | grep -m1 'id:' | awk '{print $NF}')
+
+          STATUS=$(echo "$SUBMIT_OUTPUT" | grep -i 'status:' | tail -1 | awk '{print $NF}')
+          if [ "$STATUS" != "Accepted" ]; then
+            echo "::error::Notarization failed with status: $STATUS"
+            echo "--- Fetching notarization log ---"
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_ID_PASSWORD" || true
+            exit 1
+          fi
 
           xcrun stapler staple "build/Release/claudeNotch.app"
 
@@ -116,8 +161,8 @@ jobs:
           fi
 
           echo "$SPARKLE_PRIVATE_KEY" > "$RUNNER_TEMP/sparkle_key"
-          SPARKLE_KEY_FILE="$RUNNER_TEMP/sparkle_key" \
           ./Configuration/sparkle/bin/generate_appcast appcast_staging \
+            --ed-key-file "$RUNNER_TEMP/sparkle_key" \
             --download-url-prefix "https://github.com/hpriehle/claude-notch/releases/download/${GITHUB_REF_NAME}/"
           rm -f "$RUNNER_TEMP/sparkle_key"
 

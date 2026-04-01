@@ -212,6 +212,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Start extra usage promotion tracking
         _ = ExtraUsageService.shared
 
+        // Start service status monitoring
+        _ = ClaudeStatusService.shared
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(screenConfigurationDidChange),

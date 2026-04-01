@@ -4,6 +4,14 @@
         <title>ClaudeNotch</title>
         <link>https://hpriehle.github.io/claude-notch/appcast.xml</link>
         <item>
+            <title>1.0.3</title>
+            <pubDate>Thu, 26 Mar 2026 23:06:21 +0000</pubDate>
+            <sparkle:version>4</sparkle:version>
+            <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/hpriehle/claude-notch/releases/download/v1.0.3/ClaudeNotch.dmg" length="6095848" type="application/octet-stream" sparkle:edSignature="QzAetKEFRUaSPUvv3cLTGqdldhLw2RoeRkcw4HylTQWb7+wTjEeEl2C7Q5ychs5GDwEbkfAHFDV9nWKROvQzBw=="/>
+        </item>
+        <item>
             <title>1.0.2</title>
             <pubDate>Fri, 20 Mar 2026 03:32:06 -0400</pubDate>
             <sparkle:version>3</sparkle:version>
