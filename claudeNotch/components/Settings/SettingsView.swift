@@ -548,16 +548,24 @@ struct ClaudeSettings: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 6) {
                             Circle()
-                                .fill(usageService.currentUsage.hasOAuthData ? Color.green : (usageService.hasOAuthData ? Color.yellow.opacity(0.8) : Color.gray.opacity(0.5)))
+                                .fill(usageService.currentUsage.hasOAuthData
+                                      ? Color.green
+                                      : (usageService.hasOAuthData
+                                         ? (usageService.isInitialFetchInProgress ? Color.yellow.opacity(0.8) : (usageService.lastRefreshError != nil ? Color.orange : Color.yellow.opacity(0.8)))
+                                         : Color.gray.opacity(0.5)))
                                 .frame(width: 8, height: 8)
-                            Text(usageService.currentUsage.hasOAuthData ? "Connected via Claude Code" : (usageService.hasOAuthData ? "Connecting..." : "Not connected"))
+                            Text(usageService.currentUsage.hasOAuthData
+                                 ? "Connected via Claude Code"
+                                 : (usageService.hasOAuthData
+                                    ? (usageService.isInitialFetchInProgress ? "Connecting..." : "Connected via Claude Code")
+                                    : "Not connected"))
                                 .font(.system(size: 13, weight: .medium))
                         }
-                        if usageService.currentUsage.hasOAuthData {
+                        if usageService.currentUsage.hasOAuthData || (usageService.hasOAuthData && !usageService.isInitialFetchInProgress) {
                             Text("Usage data refreshes every 120 seconds from Anthropic API")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                        } else {
+                        } else if !usageService.hasOAuthData {
                             Text("Connect your Claude account for real-time usage percentages")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)

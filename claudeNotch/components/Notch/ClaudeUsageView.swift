@@ -120,11 +120,29 @@ struct ClaudeUsageView: View {
 
 
                 ConnectionStatusView(
-                    isConnected: vm.usageData.isOAuthConnected,
+                    isConnected: vm.usageData.isOAuthConnected || usageService.hasOAuthData,
                     isLoading: usageService.isInitialFetchInProgress
                 )
             }
             .padding(.bottom, 4)
+
+            // Warning banner for API errors (e.g. 429 rate limit)
+            if let error = usageService.lastRefreshError {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.orange)
+                    Text(error)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.orange.opacity(0.9))
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+            }
 
             // Extra usage countdown
             if extraUsage.isExtraUsageActive, let endsAt = extraUsage.extraUsageEndsAt {
