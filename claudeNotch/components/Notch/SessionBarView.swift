@@ -5,6 +5,7 @@
 //  Created by Harrison Riehle on 2026. 01. 14..
 //
 
+import Defaults
 import SwiftUI
 import Defaults
 
@@ -12,6 +13,7 @@ import Defaults
 struct SessionBarView: View {
     let percent: Int
     let color: Color
+    var isHovering: Bool = false
     @ObservedObject private var extraUsage = ExtraUsageService.shared
     @ObservedObject private var statusService = ClaudeStatusService.shared
 
@@ -53,10 +55,16 @@ struct SessionBarView: View {
                 .frame(width: 32, alignment: .trailing)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.black.opacity(0.8))
+            UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 8, bottomTrailingRadius: 8, topTrailingRadius: 0)
+                .fill(Color.black)
+        )
+        .shadow(
+            color: isHovering && Defaults[.enableShadow]
+                ? .black.opacity(0.7) : .clear,
+            radius: 4
         )
     }
 }

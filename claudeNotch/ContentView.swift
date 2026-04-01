@@ -72,7 +72,7 @@ struct ContentView: View {
                         ? (cornerRadiusInsets.opened.top) : (cornerRadiusInsets.opened.bottom)
                         : cornerRadiusInsets.closed.bottom
                     )
-                    .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
+                    .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : -8)
                     .background(.black)
                     .clipShape(currentNotchShape)
                     .overlay(alignment: .top) {
@@ -84,10 +84,6 @@ struct ContentView: View {
                     .shadow(
                         color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
                             ? .black.opacity(0.7) : .clear, radius: Defaults[.cornerRadiusScaling] ? 6 : 4
-                    )
-                    .padding(
-                        .bottom,
-                        vm.effectiveClosedNotchHeight == 0 ? 10 : 0
                     )
 
                 mainLayout
@@ -166,9 +162,8 @@ struct ContentView: View {
                 // Hide during initial load to avoid showing 0% before real data arrives
                 let effectiveSessionPercent = vm.usageData.oauthSessionPercent
                 if vm.notchState == .closed, Defaults[.showSessionBar], !usageService.isInitialFetchInProgress, let sessionPercent = effectiveSessionPercent {
-                    SessionBarView(percent: sessionPercent, color: vm.usageData.colorForPercent(sessionPercent))
+                    SessionBarView(percent: sessionPercent, color: vm.usageData.colorForPercent(sessionPercent), isHovering: isHovering)
                         .frame(width: vm.closedNotchSize.width)
-                        .padding(.top, 2)
                         .onTapGesture {
                             doOpen()
                         }
