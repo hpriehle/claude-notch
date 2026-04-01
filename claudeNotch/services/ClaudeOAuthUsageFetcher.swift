@@ -34,7 +34,7 @@ struct OAuthUsageResponse: Codable {
 
 struct OAuthRateWindow: Codable {
     let utilization: Double  // 0-100 percentage
-    let resetsAt: String     // ISO 8601
+    let resetsAt: String?     // ISO 8601
 
     enum CodingKeys: String, CodingKey {
         case utilization
@@ -47,7 +47,7 @@ struct OAuthRateWindow: Codable {
         // then parse with ISO8601DateFormatter which reliably handles +00:00.
 
         // 1. Strip fractional seconds: ".068410" → ""
-        let cleaned = resetsAt.replacingOccurrences(
+        let cleaned = (resetsAt ?? "").replacingOccurrences(
             of: "\\.\\d+",
             with: "",
             options: .regularExpression
@@ -57,7 +57,7 @@ struct OAuthRateWindow: Codable {
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime]
         if let date = iso.date(from: cleaned) {
-            NSLog("[ClaudeOAuthUsageFetcher] Parsed resets_at: '%@' → %@", resetsAt, date.description)
+            NSLog("[ClaudeOAuthUsageFetcher] Parsed resets_at: '%@' → %@", resetsAt ?? "N/A", date.description)
             return date
         }
 
@@ -65,10 +65,11 @@ struct OAuthRateWindow: Codable {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSSxxxxx"
-        if let date = formatter.date(from: resetsAt) { return date }
+        if let resetsAt, let date = formatter.date(from: resetsAt) { return date }
 
         // 4. Last resort
-        NSLog("[ClaudeOAuthUsageFetcher] Failed to parse resets_at: '%@'", resetsAt)
+        NSLog("[ClaudeOAuthUsageFetcher] Failed to parse resets_at: '%@'", resetsAt ?? "N/A")
+        guard let resetsAt else { return nil }
         return ISO8601DateFormatter().date(from: resetsAt)
     }
 }
