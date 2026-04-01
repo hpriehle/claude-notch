@@ -142,9 +142,12 @@ class ClaudeOAuthCredentialStore {
 
     /// Trigger Claude CLI to refresh its token by running `claude /status`
     func triggerCLIRefresh() {
+        // Use a login shell to pick up the user's full PATH,
+        // since GUI apps don't inherit terminal PATH.
+        let userShell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["claude", "/status"]
+        process.executableURL = URL(fileURLWithPath: userShell)
+        process.arguments = ["-l", "-c", "claude /status"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 
