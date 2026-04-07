@@ -144,6 +144,9 @@ final class DailyTokenCache {
         let decoder = JSONDecoder()
 
         for case let url as URL in enumerator {
+            // Check for Task cancellation periodically to allow timeout/cancel
+            if Task.isCancelled { break }
+
             guard url.pathExtension == "jsonl" else { continue }
             guard let mod = try? url.resourceValues(forKeys: [.contentModificationDateKey])
                     .contentModificationDate,

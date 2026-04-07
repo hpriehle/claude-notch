@@ -58,6 +58,12 @@ struct RateLimitPrediction {
     )
 }
 
+/// Thread-safe mutable box for use across Task boundaries
+private final class UnsafeSendableBox<T>: @unchecked Sendable {
+    var value: T
+    init(value: T) { self.value = value }
+}
+
 /// Main service that orchestrates all usage data sources and provides unified updates
 class ClaudeUsageService: ObservableObject {
     static let shared = ClaudeUsageService()
@@ -94,6 +100,7 @@ class ClaudeUsageService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var midnightTimer: Timer?
     private var tokenRefreshTimer: Timer?
+    private var isTokenCacheRefreshing = false
 
     // MARK: - Initialization
 
@@ -172,11 +179,30 @@ class ClaudeUsageService: ObservableObject {
     // MARK: - Token Cache Refresh
 
     private func refreshTokenCache() {
+        // Prevent concurrent refreshes from piling up if one takes longer than the timer interval
+        guard !isTokenCacheRefreshing else {
+            print("[ClaudeUsageService] Token cache refresh already in progress — skipping")
+            return
+        }
+        isTokenCacheRefreshing = true
+
         let dir = parser.projectsPath
-        Task.detached(priority: .utility) {
-            let _ = await DailyTokenCache.shared.update(projectsDir: dir)
+        Task.detached(priority: .utility) { [weak self] in
+            // Timeout after 30s to prevent indefinite hangs on heavy I/O
+            let result: [String: Int]? = await self?.withTaskTimeout(seconds: 30) {
+                await DailyTokenCache.shared.update(projectsDir: dir)
+            } ?? nil
+
             await MainActor.run {
-                NotificationCenter.default.post(name: .claudeUsageDataReceived, object: nil)
+                self?.isTokenCacheRefreshing = false
+            }
+
+            if result != nil {
+                await MainActor.run {
+                    NotificationCenter.default.post(name: .claudeUsageDataReceived, object: nil)
+                }
+            } else {
+                print("[ClaudeUsageService] Token cache refresh timed out or failed")
             }
         }
     }
@@ -207,10 +233,13 @@ class ClaudeUsageService: ObservableObject {
         lastRefreshError = nil
         ClaudeOAuthCredentialStore.shared.invalidateCache()
         refreshCodeUsage()
-        // Also trigger an OAuth refresh
+        // Also trigger an OAuth refresh with a 15s timeout to prevent indefinite hangs
         Task {
             let startTime = Date()
-            let snapshot = await oauthFetcher.fetchUsage()
+
+            let snapshot: OAuthUsageSnapshot? = await withTaskTimeout(seconds: 15) {
+                await self.oauthFetcher.fetchUsage()
+            } ?? nil
 
             // Ensure spinner shows for at least 0.8s so user sees feedback
             let elapsed = Date().timeIntervalSince(startTime)
@@ -219,15 +248,42 @@ class ClaudeUsageService: ObservableObject {
             }
 
             await MainActor.run {
+                defer { self.isRefreshing = false }
                 if let snapshot = snapshot {
                     self.handleOAuthUsageData(snapshot)
                     self.lastRefreshError = nil
                     print("[ClaudeUsageService] refresh() succeeded - session=\(snapshot.sessionPercent)%, weekly=\(snapshot.weeklyAllPercent)%")
                 } else {
                     self.lastRefreshError = "Failed to fetch usage data. Check that `claude /login` has been run."
-                    print("[ClaudeUsageService] refresh() failed - fetchUsage returned nil")
+                    print("[ClaudeUsageService] refresh() failed - fetchUsage returned nil or timed out")
                 }
-                self.isRefreshing = false
+            }
+        }
+    }
+
+    /// Runs an async closure with a timeout. Returns nil if the timeout expires.
+    private func withTaskTimeout<T>(seconds: TimeInterval, operation: @escaping () async -> T) async -> T? {
+        await withCheckedContinuation { continuation in
+            let completed = UnsafeSendableBox(value: false)
+            let lock = NSLock()
+
+            Task {
+                let result = await operation()
+                lock.lock()
+                guard !completed.value else { lock.unlock(); return }
+                completed.value = true
+                lock.unlock()
+                continuation.resume(returning: result)
+            }
+
+            Task {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                lock.lock()
+                guard !completed.value else { lock.unlock(); return }
+                completed.value = true
+                lock.unlock()
+                print("[ClaudeUsageService] Operation timed out after \(seconds)s")
+                continuation.resume(returning: nil)
             }
         }
     }
@@ -247,50 +303,55 @@ class ClaudeUsageService: ObservableObject {
     // MARK: - Code Usage (from ~/.claude/ logs)
 
     private func refreshCodeUsage() {
-        print("[ClaudeUsageService] Refreshing code usage...")
-        print("[ClaudeUsageService] Claude directory exists: \(parser.claudeDirectoryExists())")
-        print("[ClaudeUsageService] Stats cache exists: \(parser.statsCacheExists())")
-        print("[ClaudeUsageService] Stats cache path: \(parser.statsCachePath.path)")
+        // Run file I/O off the main thread to prevent UI stalls
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
 
-        var codeCalculated: CalculatedUsage?
+            print("[ClaudeUsageService] Refreshing code usage...")
+            print("[ClaudeUsageService] Claude directory exists: \(self.parser.claudeDirectoryExists())")
+            print("[ClaudeUsageService] Stats cache exists: \(self.parser.statsCacheExists())")
+            print("[ClaudeUsageService] Stats cache path: \(self.parser.statsCachePath.path)")
 
-        // Try to read from stats-cache.json first (faster, pre-aggregated)
-        if let statsCache = parser.parseStatsCache() {
-            let parsedUsage = parser.usageFromStatsCache(statsCache)
-            codeCalculated = calculator.calculatePercentages(from: parsedUsage)
-            print("[ClaudeUsageService] Loaded from stats-cache.json:")
-            print("  - Weekly tokens: \(parsedUsage.weeklyTokens)")
-            print("  - Today tokens: \(parsedUsage.todayTokens)")
-            print("  - Total tokens all time: \(parsedUsage.totalTokensAllTime)")
-            print("  - Sonnet tokens: \(parsedUsage.sonnetTokens)")
-            print("  - Opus tokens: \(parsedUsage.opusTokens)")
-            print("  - Total sessions: \(parsedUsage.totalSessions)")
-        } else {
-            print("[ClaudeUsageService] stats-cache.json not available, trying JSONL fallback...")
-            // Fallback: parse JSONL files directly
-            let entries = parser.parseAllProjectLogs()
-            if !entries.isEmpty {
-                let parsedUsage = parser.usageFromLogEntries(entries)
-                codeCalculated = calculator.calculatePercentages(from: parsedUsage)
-                print("[ClaudeUsageService] Parsed \(entries.count) log entries:")
+            var codeCalculated: CalculatedUsage?
+
+            // Try to read from stats-cache.json first (faster, pre-aggregated)
+            if let statsCache = self.parser.parseStatsCache() {
+                let parsedUsage = self.parser.usageFromStatsCache(statsCache)
+                codeCalculated = self.calculator.calculatePercentages(from: parsedUsage)
+                print("[ClaudeUsageService] Loaded from stats-cache.json:")
                 print("  - Weekly tokens: \(parsedUsage.weeklyTokens)")
                 print("  - Today tokens: \(parsedUsage.todayTokens)")
+                print("  - Total tokens all time: \(parsedUsage.totalTokensAllTime)")
+                print("  - Sonnet tokens: \(parsedUsage.sonnetTokens)")
+                print("  - Opus tokens: \(parsedUsage.opusTokens)")
+                print("  - Total sessions: \(parsedUsage.totalSessions)")
             } else {
-                print("[ClaudeUsageService] No Claude Code logs found in projects directory")
+                print("[ClaudeUsageService] stats-cache.json not available, trying JSONL fallback...")
+                // Fallback: parse JSONL files directly
+                let entries = self.parser.parseAllProjectLogs()
+                if !entries.isEmpty {
+                    let parsedUsage = self.parser.usageFromLogEntries(entries)
+                    codeCalculated = self.calculator.calculatePercentages(from: parsedUsage)
+                    print("[ClaudeUsageService] Parsed \(entries.count) log entries:")
+                    print("  - Weekly tokens: \(parsedUsage.weeklyTokens)")
+                    print("  - Today tokens: \(parsedUsage.todayTokens)")
+                } else {
+                    print("[ClaudeUsageService] No Claude Code logs found in projects directory")
+                }
             }
-        }
 
-        if let calc = codeCalculated {
-            print("[ClaudeUsageService] Calculated usage:")
-            print("  - Weekly all percent: \(calc.weeklyAllPercent)%")
-            print("  - Weekly sonnet percent: \(calc.weeklySonnetPercent)%")
-            print("  - Has data: \(calc.hasData)")
-        } else {
-            print("[ClaudeUsageService] No calculated usage - codeCalculated is nil")
-        }
+            if let calc = codeCalculated {
+                print("[ClaudeUsageService] Calculated usage:")
+                print("  - Weekly all percent: \(calc.weeklyAllPercent)%")
+                print("  - Weekly sonnet percent: \(calc.weeklySonnetPercent)%")
+                print("  - Has data: \(calc.hasData)")
+            } else {
+                print("[ClaudeUsageService] No calculated usage - codeCalculated is nil")
+            }
 
-        // Update usage data with code values
-        updateUsageData(codeUsage: codeCalculated)
+            // Update usage data (updateUsageData dispatches to main thread internally)
+            self.updateUsageData(codeUsage: codeCalculated)
+        }
     }
 
     // MARK: - OAuth Usage (from Anthropic API)
