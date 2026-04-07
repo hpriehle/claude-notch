@@ -141,6 +141,7 @@ class ClaudeOAuthCredentialStore {
     }
 
     /// Trigger Claude CLI to refresh its token by running `claude /status`
+    /// Uses a 10-second timeout to prevent indefinite hangs if the CLI is slow or stuck.
     func triggerCLIRefresh() {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -150,7 +151,20 @@ class ClaudeOAuthCredentialStore {
 
         do {
             try process.run()
-            process.waitUntilExit()
+
+            // Wait on a background queue with a timeout instead of blocking indefinitely
+            let semaphore = DispatchSemaphore(value: 0)
+            DispatchQueue.global(qos: .utility).async {
+                process.waitUntilExit()
+                semaphore.signal()
+            }
+
+            let timeout = semaphore.wait(timeout: .now() + 10)
+            if timeout == .timedOut {
+                print("[ClaudeOAuthCredentialStore] CLI refresh timed out after 10s — terminating process")
+                process.terminate()
+            }
+
             invalidateCache()
         } catch {
             print("[ClaudeOAuthCredentialStore] CLI refresh failed: \(error)")
@@ -171,7 +185,20 @@ class ClaudeOAuthCredentialStore {
 
         do {
             try process.run()
-            process.waitUntilExit()
+
+            // Wait with a 5-second timeout to prevent hangs if keychain daemon is slow
+            let semaphore = DispatchSemaphore(value: 0)
+            DispatchQueue.global(qos: .utility).async {
+                process.waitUntilExit()
+                semaphore.signal()
+            }
+
+            let timeout = semaphore.wait(timeout: .now() + 5)
+            if timeout == .timedOut {
+                print("[ClaudeOAuthCredentialStore] Keychain read timed out after 5s — terminating process")
+                process.terminate()
+                return nil
+            }
 
             guard process.terminationStatus == 0 else {
                 print("[ClaudeOAuthCredentialStore] Keychain entry not found (status \(process.terminationStatus))")
