@@ -126,27 +126,6 @@ struct ClaudeLoginView: View {
         isConnecting = true
         connectionError = nil
 
-        let whichProcess = Process()
-        whichProcess.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        whichProcess.arguments = ["claude"]
-        whichProcess.standardOutput = FileHandle.nullDevice
-        whichProcess.standardError = FileHandle.nullDevice
-
-        do {
-            try whichProcess.run()
-            whichProcess.waitUntilExit()
-        } catch {
-            isConnecting = false
-            connectionError = "Could not check for Claude CLI."
-            return
-        }
-
-        if whichProcess.terminationStatus != 0 {
-            isConnecting = false
-            connectionError = "Claude Code CLI not found. Install it first, then run: claude /login"
-            return
-        }
-
         ClaudeOAuthCredentialStore.shared.invalidateCache()
 
         if ClaudeOAuthCredentialStore.shared.hasCredentials {
@@ -155,7 +134,7 @@ struct ClaudeLoginView: View {
             withAnimation { isConnected = true }
         } else {
             isConnecting = false
-            connectionError = "No OAuth credentials found. Run `claude /login` in your terminal first."
+            connectionError = "No OAuth credentials found. Install Claude Code CLI and run `claude /login` in your terminal first."
         }
     }
 }

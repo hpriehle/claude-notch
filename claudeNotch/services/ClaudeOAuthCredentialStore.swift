@@ -47,6 +47,15 @@ class ClaudeOAuthCredentialStore {
     private var cacheTimestamp: Date?
     private let cacheTTL: TimeInterval = 300 // 5 minutes
 
+    /// Where the current credentials were loaded from. Determines where refreshed
+    /// tokens get persisted so we don't invalidate Claude Code's rotated refresh token.
+    private enum CredentialSource {
+        case env
+        case keychain(account: String)
+        case file
+    }
+    private var credentialSource: CredentialSource?
+
     private init() {}
 
     // MARK: - Public API
@@ -69,18 +78,21 @@ class ClaudeOAuthCredentialStore {
                 expiresAt: nil,
                 scopes: nil
             )
+            credentialSource = .env
             cache(creds)
             return creds
         }
 
         // Try keychain (via security CLI to avoid permission dialogs)
         if let creds = loadFromKeychain() {
+            credentialSource = .keychain(account: keychainAccount() ?? "")
             cache(creds)
             return creds
         }
 
         // Try credentials file
         if let creds = loadFromFile() {
+            credentialSource = .file
             cache(creds)
             return creds
         }
@@ -132,6 +144,10 @@ class ClaudeOAuthCredentialStore {
                 expiresAt: expiresAt,
                 scopes: nil
             )
+            // Persist rotated tokens back to the shared store BEFORE caching.
+            // Anthropic rotates the refresh token on every refresh; if we don't write
+            // it back, Claude Code's stored refresh token goes stale and forces /login.
+            persistRefreshedCredentials(creds)
             cache(creds)
             return creds
         } catch {
@@ -142,9 +158,12 @@ class ClaudeOAuthCredentialStore {
 
     /// Trigger Claude CLI to refresh its token by running `claude /status`
     func triggerCLIRefresh() {
+        // Use a login shell to pick up the user's full PATH,
+        // since GUI apps don't inherit terminal PATH.
+        let userShell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["claude", "/status"]
+        process.executableURL = URL(fileURLWithPath: userShell)
+        process.arguments = ["-l", "-c", "claude /status"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
 
@@ -160,7 +179,13 @@ class ClaudeOAuthCredentialStore {
     // MARK: - Keychain Reading
 
     private func loadFromKeychain() -> ClaudeOAuthCredentials? {
-        // Use /usr/bin/security CLI to avoid macOS permission dialogs
+        guard let jsonString = readKeychainRaw() else { return nil }
+        return parseCredentialsJSON(jsonString)
+    }
+
+    /// Read the raw JSON blob from the keychain entry, or nil if absent.
+    /// Uses /usr/bin/security CLI to avoid macOS permission dialogs.
+    private func readKeychainRaw() -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
         process.arguments = ["find-generic-password", "-s", keychainService, "-w"]
@@ -183,10 +208,38 @@ class ClaudeOAuthCredentialStore {
                   !jsonString.isEmpty else {
                 return nil
             }
-
-            return parseCredentialsJSON(jsonString)
+            return jsonString
         } catch {
             print("[ClaudeOAuthCredentialStore] Keychain read error: \(error)")
+            return nil
+        }
+    }
+
+    /// Read the account name ("acct" attribute) of the keychain entry so we can
+    /// preserve it when updating the entry.
+    private func keychainAccount() -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        process.arguments = ["find-generic-password", "-s", keychainService]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8) ?? ""
+            // Attribute line looks like: "acct"<blob>="someaccount"
+            guard let range = output.range(of: "\"acct\"<blob>=\"") else { return nil }
+            let rest = output[range.upperBound...]
+            guard let end = rest.firstIndex(of: "\"") else { return nil }
+            let account = String(rest[..<end])
+            return account.isEmpty ? nil : account
+        } catch {
             return nil
         }
     }
@@ -236,6 +289,105 @@ class ClaudeOAuthCredentialStore {
         } catch {
             print("[ClaudeOAuthCredentialStore] JSON parse error: \(error)")
             return nil
+        }
+    }
+
+    // MARK: - Persistence
+
+    /// Write refreshed tokens back to whichever source they were loaded from.
+    private func persistRefreshedCredentials(_ creds: ClaudeOAuthCredentials) {
+        switch credentialSource {
+        case .keychain(let account):
+            persistToKeychain(creds, account: account)
+        case .file:
+            persistToFile(creds)
+        case .env, .none:
+            // Env-var token has no refresh token — nothing to persist.
+            // .none shouldn't happen (refresh implies a prior load), but be safe.
+            break
+        }
+    }
+
+    /// Merge refreshed tokens into an existing credential JSON document, preserving
+    /// any keys we don't manage (other top-level keys, scopes, etc.).
+    private func mergedCredentialJSON(existing: String?, creds: ClaudeOAuthCredentials) -> String? {
+        var root: [String: Any] = [:]
+        if let existing,
+           let data = existing.data(using: .utf8),
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            root = obj
+        }
+
+        var oauth = root["claudeAiOauth"] as? [String: Any] ?? [:]
+        oauth["accessToken"] = creds.accessToken
+        if let refreshToken = creds.refreshToken {
+            oauth["refreshToken"] = refreshToken
+        }
+        if let expiresAt = creds.expiresAt {
+            // File/keychain store milliseconds since epoch.
+            oauth["expiresAt"] = Int(expiresAt.timeIntervalSince1970 * 1000)
+        }
+        if let scopes = creds.scopes {
+            oauth["scopes"] = scopes
+        }
+        root["claudeAiOauth"] = oauth
+
+        guard let out = try? JSONSerialization.data(withJSONObject: root),
+              let string = String(data: out, encoding: .utf8) else {
+            return nil
+        }
+        return string
+    }
+
+    private func persistToKeychain(_ creds: ClaudeOAuthCredentials, account: String) {
+        guard !account.isEmpty else {
+            print("[ClaudeOAuthCredentialStore] Skipping keychain persist: no account name")
+            return
+        }
+        guard let json = mergedCredentialJSON(existing: readKeychainRaw(), creds: creds) else {
+            return
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+        // -U updates the entry if it already exists.
+        process.arguments = ["add-generic-password", "-U", "-s", keychainService, "-a", account, "-w", json]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            if process.terminationStatus != 0 {
+                print("[ClaudeOAuthCredentialStore] Keychain persist failed (status \(process.terminationStatus))")
+            }
+        } catch {
+            print("[ClaudeOAuthCredentialStore] Keychain persist error: \(error)")
+        }
+    }
+
+    private func persistToFile(_ creds: ClaudeOAuthCredentials) {
+        // Only rewrite if the file already existed when loaded.
+        guard FileManager.default.fileExists(atPath: credentialsFilePath.path) else {
+            return
+        }
+
+        let existing = try? String(contentsOf: credentialsFilePath, encoding: .utf8)
+        guard let json = mergedCredentialJSON(existing: existing, creds: creds),
+              let data = json.data(using: .utf8) else {
+            return
+        }
+
+        // Write atomically (temp + rename) with 0600 permissions.
+        let tempURL = credentialsFilePath.deletingLastPathComponent()
+            .appendingPathComponent(".credentials.json.tmp.\(UUID().uuidString)")
+        do {
+            try data.write(to: tempURL, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: tempURL.path)
+            _ = try FileManager.default.replaceItemAt(credentialsFilePath, withItemAt: tempURL)
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+            print("[ClaudeOAuthCredentialStore] File persist error: \(error)")
         }
     }
 

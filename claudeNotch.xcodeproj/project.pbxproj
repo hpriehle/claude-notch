@@ -258,7 +258,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		11F7485C2EC9AABA00F841DB /* Exceptions for "ClaudeNotchXPCHelper" folder in "ClaudeNotchXPCHelper" target */ = {
+		11F7485C2EC9AABA00F841DB /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -268,29 +268,8 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		112FB72F2CCF12CC0015238C /* private */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = private;
-			sourceTree = "<group>";
-		};
-		11F748502EC9AABA00F841DB /* ClaudeNotchXPCHelper */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				11F7485C2EC9AABA00F841DB /* Exceptions for "ClaudeNotchXPCHelper" folder in "ClaudeNotchXPCHelper" target */,
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = ClaudeNotchXPCHelper;
-			sourceTree = "<group>";
-		};
+		112FB72F2CCF12CC0015238C /* private */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = private; sourceTree = "<group>"; };
+		11F748502EC9AABA00F841DB /* ClaudeNotchXPCHelper */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (11F7485C2EC9AABA00F841DB /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ClaudeNotchXPCHelper; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -349,28 +328,6 @@
 			children = (
 			);
 			path = Views;
-			sourceTree = "<group>";
-		};
-		1132E5232E78D6DA0068732D /* YouTube Music Controller */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = "YouTube Music Controller";
-			sourceTree = "<group>";
-		};
-		1153BD8E2D986B1F00979FB0 /* MediaControllers */ = {
-			isa = PBXGroup;
-			children = (
-				1132E5232E78D6DA0068732D /* YouTube Music Controller */,
-			);
-			path = MediaControllers;
-			sourceTree = "<group>";
-		};
-		116398942DF5D6B40052E6AF /* Providers */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Providers;
 			sourceTree = "<group>";
 		};
 		11F748672EC9AC9600F841DB /* XPCHelperClient */ = {
@@ -485,7 +442,6 @@
 			isa = PBXGroup;
 			children = (
 				11F748672EC9AC9600F841DB /* XPCHelperClient */,
-				116398942DF5D6B40052E6AF /* Providers */,
 				14288DE22C6E016F00B9F80C /* observers */,
 				14288DD92C6E015000B9F80C /* helpers */,
 				B186543A2C6F49A4000B926A /* Shortcuts */,
@@ -494,7 +450,6 @@
 				14D570BA2C5E98E30011E668 /* enums */,
 				14D570B72C5E98960011E668 /* animations */,
 				147163B52C5D804B0068B555 /* managers */,
-				1153BD8E2D986B1F00979FB0 /* MediaControllers */,
 				B15063502C63D3F600EBB0E3 /* extensions */,
 				1471639B2C5D362F0068B555 /* components */,
 				14CEF4152C5CAED300855D72 /* claudeNotchApp.swift */,
@@ -564,7 +519,6 @@
 				51D0862F5B0C95629FC905FA /* ContributionGridView.swift */,
 				891928D537C3CFFD1555DEFA /* StatsDetailView.swift */,
 			);
-			name = Stats;
 			path = Stats;
 			sourceTree = "<group>";
 		};
@@ -703,7 +657,6 @@
 				F6E710C1144B013A67EA52A5 /* ExtraUsageService.swift */,
 				350E5127D0BF6CBA5C2ED064 /* ClaudeStatusService.swift */,
 			);
-			name = services;
 			path = services;
 			sourceTree = "<group>";
 		};
