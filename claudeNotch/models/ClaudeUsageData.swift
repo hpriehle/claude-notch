@@ -65,6 +65,14 @@ struct ClaudeUsageData: Codable, Equatable {
         return oauthSessionPercent != nil || oauthWeeklyAllPercent != nil
     }
 
+    /// OAuth data is present but the API reports no 5-hour session window
+    /// (verified Ultra accounts have no session limit since Oct 30 2026).
+    var hasNoSessionLimit: Bool {
+        return oauthSessionPercent == nil && oauthWeeklyAllPercent != nil
+    }
+
+    static let noSessionLimitText = "Session: no 5-hour limit on Ultra"
+
     var hasCodeData: Bool {
         return codeWeeklyTokens != nil && codeWeeklyTokens! > 0
     }
