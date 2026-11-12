@@ -94,6 +94,8 @@ class ClaudeUsageService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var midnightTimer: Timer?
     private var tokenRefreshTimer: Timer?
+    /// Set as soon as any OAuth snapshot has been handled.
+    private var oauthSnapshotReceived = false
 
     // MARK: - Initialization
 
@@ -120,8 +122,9 @@ class ClaudeUsageService: ObservableObject {
                 onInitialFetchComplete: { [weak self] in
                     guard let self = self else { return }
                     self.isInitialFetchInProgress = false
-                    // If we never got data, credentials were bad — show disconnected, not loading
-                    if !self.currentUsage.hasOAuthData {
+                    // If we never got data, credentials were bad — show disconnected, not loading.
+                    // (currentUsage is assigned asynchronously, so check the synchronous flag.)
+                    if !self.oauthSnapshotReceived {
                         self.hasOAuthData = false
                         DebugLog.log("[ClaudeUsageService] Initial fetch failed — marking as disconnected")
                     }
@@ -296,6 +299,7 @@ class ClaudeUsageService: ObservableObject {
     // MARK: - OAuth Usage (from Anthropic API)
 
     private func handleOAuthUsageData(_ snapshot: OAuthUsageSnapshot) {
+        oauthSnapshotReceived = true
         DebugLog.log("[ClaudeUsageService] OAUTH RECEIVED: session=\(snapshot.sessionPercent.map { "\($0)%" } ?? "none"), weekly=\(snapshot.weeklyAllPercent)%, \(snapshot.weeklyScopedModelName ?? "no scoped model")=\(snapshot.weeklySonnetPercent.map { "\($0)%" } ?? "none")")
         updateUsageData(oauthUsage: snapshot)
     }
