@@ -17,7 +17,8 @@ class UsageCalculator {
     static let tokensPerHour: [String: Int] = [
         "sonnet": 50_000,    // ~50k tokens per "usage hour" for Sonnet
         "opus": 30_000,      // Opus uses quota faster
-        "haiku": 100_000     // Haiku uses less quota
+        "haiku": 100_000,    // Haiku uses less quota
+        "fable": 30_000      // Fable: assumed to use quota like Opus (rough guess)
     ]
 
     // Weekly limit estimates (Pro plan)
@@ -38,13 +39,14 @@ class UsageCalculator {
         let sonnetHours = Double(usage.sonnetTokens) / Double(Self.tokensPerHour["sonnet"] ?? 50_000)
         let opusHours = Double(usage.opusTokens) / Double(Self.tokensPerHour["opus"] ?? 30_000)
         let haikuHours = Double(usage.haikuTokens) / Double(Self.tokensPerHour["haiku"] ?? 100_000)
+        let fableHours = Double(usage.fableTokens) / Double(Self.tokensPerHour["fable"] ?? 30_000)
 
         // Calculate weekly percentages
         let sonnetPercent = min(100, Int((sonnetHours / Self.weeklyLimitHours["sonnet"]!) * 100))
         let opusPercent = min(100, Int((opusHours / Self.weeklyLimitHours["opus"]!) * 100))
 
         // All models combined (weighted estimate)
-        let totalHours = sonnetHours + opusHours + haikuHours
+        let totalHours = sonnetHours + opusHours + haikuHours + fableHours
         let allModelsPercent = min(100, Int((totalHours / Self.weeklyLimitHours["all"]!) * 100))
 
         // Weekly tokens to percent (rough estimate: 4M tokens = 100%)
@@ -60,6 +62,7 @@ class UsageCalculator {
             sonnetHours: sonnetHours,
             opusHours: opusHours,
             haikuHours: haikuHours,
+            fableHours: fableHours,
             totalSessions: usage.totalSessions,
             totalMessages: usage.totalMessages,
             lastUpdated: usage.lastUpdated
@@ -137,12 +140,13 @@ struct CalculatedUsage {
     let sonnetHours: Double
     let opusHours: Double
     let haikuHours: Double
+    let fableHours: Double
     let totalSessions: Int
     let totalMessages: Int
     let lastUpdated: Date
 
     var totalHours: Double {
-        return sonnetHours + opusHours + haikuHours
+        return sonnetHours + opusHours + haikuHours + fableHours
     }
 
     var hasData: Bool {
@@ -160,6 +164,7 @@ struct CalculatedUsage {
             sonnetHours: 0,
             opusHours: 0,
             haikuHours: 0,
+            fableHours: 0,
             totalSessions: 0,
             totalMessages: 0,
             lastUpdated: Date()

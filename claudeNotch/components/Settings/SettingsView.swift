@@ -665,7 +665,7 @@ struct ClaudeSettings: View {
                     Text("Show weekly all-models usage")
                 }
                 Defaults.Toggle(key: .showWeeklySonnetUsage) {
-                    Text("Show weekly Sonnet usage")
+                    Text("Show per-model weekly usage")
                 }
             } header: {
                 Text("Usage Display")

@@ -222,7 +222,7 @@ class ClaudeUsageService: ObservableObject {
                 if let snapshot = snapshot {
                     self.handleOAuthUsageData(snapshot)
                     self.lastRefreshError = nil
-                    print("[ClaudeUsageService] refresh() succeeded - session=\(snapshot.sessionPercent)%, weekly=\(snapshot.weeklyAllPercent)%")
+                    print("[ClaudeUsageService] refresh() succeeded - session=\(snapshot.sessionPercent ?? -1)%, weekly=\(snapshot.weeklyAllPercent)%")
                 } else {
                     self.lastRefreshError = "Failed to fetch usage data. Check that `claude /login` has been run."
                     print("[ClaudeUsageService] refresh() failed - fetchUsage returned nil")
@@ -296,7 +296,7 @@ class ClaudeUsageService: ObservableObject {
     // MARK: - OAuth Usage (from Anthropic API)
 
     private func handleOAuthUsageData(_ snapshot: OAuthUsageSnapshot) {
-        print("[ClaudeUsageService \(ts())] OAUTH RECEIVED: session=\(snapshot.sessionPercent)%, weekly=\(snapshot.weeklyAllPercent)%")
+        print("[ClaudeUsageService \(ts())] OAUTH RECEIVED: session=\(snapshot.sessionPercent ?? -1)%, weekly=\(snapshot.weeklyAllPercent)%")
         updateUsageData(oauthUsage: snapshot)
     }
 
@@ -338,6 +338,7 @@ class ClaudeUsageService: ObservableObject {
             updatedUsage.oauthSessionResetTime = oauth.sessionResetTime
             updatedUsage.oauthWeeklyAllResetTime = oauth.weeklyAllResetTime
             updatedUsage.oauthWeeklySonnetResetTime = oauth.weeklySonnetResetTime
+            updatedUsage.oauthWeeklyScopedModelName = oauth.weeklyScopedModelName
             updatedUsage.oauthExtraUsageEnabled = oauth.extraUsageEnabled
             updatedUsage.oauthExtraUsageLimitDollars = oauth.extraUsageLimitDollars
             updatedUsage.oauthExtraUsageUsedDollars = oauth.extraUsageUsedDollars
@@ -345,7 +346,7 @@ class ClaudeUsageService: ObservableObject {
             updatedUsage.isOAuthConnected = true
             hasOAuthData = true
             hasChanges = true
-            print("[ClaudeUsageService \(ts())] OAuth data updated - session=\(oauth.sessionPercent)%, weekly=\(oauth.weeklyAllPercent)%")
+            print("[ClaudeUsageService \(ts())] OAuth data updated - session=\(oauth.sessionPercent ?? -1)%, weekly=\(oauth.weeklyAllPercent)%")
         }
 
         // Skip posting if nothing changed (prevents stale code-only updates from clobbering fresh web data)

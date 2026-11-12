@@ -162,6 +162,7 @@ struct ParsedCodeUsage {
     var sonnetTokens: Int = 0
     var opusTokens: Int = 0
     var haikuTokens: Int = 0
+    var fableTokens: Int = 0
     var totalSessions: Int = 0
     var totalMessages: Int = 0
     var lastUpdated: Date = Date()
@@ -228,7 +229,9 @@ class JSONLParser {
 
                 // Categorize by model
                 let lowerName = modelName.lowercased()
-                if lowerName.contains("sonnet") {
+                if lowerName.contains("fable") {
+                    usage.fableTokens += tokens
+                } else if lowerName.contains("sonnet") {
                     usage.sonnetTokens += tokens
                 } else if lowerName.contains("opus") {
                     usage.opusTokens += tokens
@@ -367,7 +370,9 @@ class JSONLParser {
             // Categorize by model
             if let model = message.model {
                 let lowerModel = model.lowercased()
-                if lowerModel.contains("sonnet") {
+                if lowerModel.contains("fable") {
+                    usage.fableTokens += tokens
+                } else if lowerModel.contains("sonnet") {
                     usage.sonnetTokens += tokens
                 } else if lowerModel.contains("opus") {
                     usage.opusTokens += tokens

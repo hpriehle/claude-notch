@@ -159,12 +159,12 @@ struct ClaudeUsageView: View {
                     )
                 }
 
-                // Weekly Sonnet Usage (default to 0% when OAuth is connected but no Sonnet-specific value available)
+                // Per-model weekly usage (model name comes from the API)
                 let weeklySonnetPercent = vm.usageData.oauthWeeklySonnetPercent
                     ?? (vm.usageData.hasOAuthData ? 0 : nil)
                 if Defaults[.showWeeklySonnetUsage], let weeklySonnetPercent = weeklySonnetPercent {
                     UsageBarView(
-                        label: "Weekly (Sonnet)",
+                        label: "Weekly (\(vm.usageData.oauthWeeklyScopedModelName ?? "per model"))",
                         percent: weeklySonnetPercent,
                         resetTime: vm.usageData.displayWeeklySonnetResetTime,
                         color: vm.usageData.colorForPercent(weeklySonnetPercent)

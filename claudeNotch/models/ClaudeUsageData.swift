@@ -23,6 +23,8 @@ struct ClaudeUsageData: Codable, Equatable {
     var oauthSessionResetTime: Date?
     var oauthWeeklyAllResetTime: Date?
     var oauthWeeklySonnetResetTime: Date?
+    /// Display name of the model the per-model weekly limit applies to (e.g. "Fable")
+    var oauthWeeklyScopedModelName: String?
     var oauthExtraUsageEnabled: Bool?
     var oauthExtraUsageLimitDollars: Double?
     var oauthExtraUsageUsedDollars: Double?
@@ -47,6 +49,7 @@ struct ClaudeUsageData: Codable, Equatable {
             oauthSessionResetTime: nil,
             oauthWeeklyAllResetTime: nil,
             oauthWeeklySonnetResetTime: nil,
+            oauthWeeklyScopedModelName: nil,
             oauthExtraUsageEnabled: nil,
             oauthExtraUsageLimitDollars: nil,
             oauthExtraUsageUsedDollars: nil,
