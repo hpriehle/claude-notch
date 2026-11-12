@@ -4,6 +4,14 @@
         <title>ClaudeNotch</title>
         <link>https://hpriehle.github.io/claude-notch/appcast.xml</link>
         <item>
+            <title>1.0.4</title>
+            <pubDate>Thu, 12 Nov 2026 23:35:51 +0000</pubDate>
+            <sparkle:version>5</sparkle:version>
+            <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <enclosure url="https://github.com/hpriehle/claude-notch/releases/download/v1.0.4/ClaudeNotch.dmg" length="6111513" type="application/octet-stream" sparkle:edSignature="B9heJPoLEep6EEj15W2ZInhdXk+qcssdDBfN3eb0McTkmROK3PMZTnXgTTcK8u6DoNGy5vNwKI1AOzLTclr1Cw=="/>
+        </item>
+        <item>
             <title>1.0.3</title>
             <pubDate>Thu, 26 Mar 2026 23:06:21 +0000</pubDate>
             <sparkle:version>4</sparkle:version>
@@ -18,21 +26,6 @@
             <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure url="https://github.com/hpriehle/claude-notch/releases/download/v1.0.2/ClaudeNotch.dmg" length="6736952" type="application/octet-stream" sparkle:edSignature="EVZ1Dx5CFewGXC9sMCFMEJQnFO8Pgosayr/BRECYhtKkBO5m6Fjum6N8SPuVm+khkVdEfWQUxyYzJJJSdByRDg=="/>
-        </item>
-        <item>
-            <title>ClaudeNotch 1.0.1</title>
-            <pubDate>Wed, 18 Mar 2026 17:05:05 -0400</pubDate>
-            <sparkle:version>2</sparkle:version>
-            <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <description><![CDATA[
-        <h2>What's New in 1.0.1</h2>
-        <ul>
-          <li>Extra Usage Promotion tracking</li>
-          <li>Fixed daily token cache accuracy</li>
-        </ul>
-      ]]></description>
-            <enclosure url="https://github.com/hpriehle/claude-notch/releases/download/v1.0.1/ClaudeNotch.dmg" length="7061878" type="application/octet-stream" sparkle:edSignature="J/z0hAS5sEJ4qqqqi/GgUDEERCKhYyc6c9VhmwwKDNevNb2BeJYUxz/l6LgYJsvxGPY/84wFzbErXO/OvL6nBA=="/>
         </item>
     </channel>
 </rss>
