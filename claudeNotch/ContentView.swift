@@ -164,7 +164,9 @@ struct ContentView: View {
 
                 // Session progress bar below notch (visible in closed state)
                 // Hide during initial load to avoid showing 0% before real data arrives
+                // No 5-hour window (verified Ultra): show the weekly all-models usage instead
                 let effectiveSessionPercent = vm.usageData.oauthSessionPercent
+                    ?? (vm.usageData.hasNoSessionLimit ? vm.usageData.oauthWeeklyAllPercent : nil)
                 if vm.notchState == .closed, Defaults[.showSessionBar], !usageService.isInitialFetchInProgress, let sessionPercent = effectiveSessionPercent {
                     SessionBarView(percent: sessionPercent, color: vm.usageData.colorForPercent(sessionPercent))
                         .frame(width: vm.closedNotchSize.width)
