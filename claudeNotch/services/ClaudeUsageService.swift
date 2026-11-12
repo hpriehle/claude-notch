@@ -123,12 +123,12 @@ class ClaudeUsageService: ObservableObject {
                     // If we never got data, credentials were bad — show disconnected, not loading
                     if !self.currentUsage.hasOAuthData {
                         self.hasOAuthData = false
-                        print("[ClaudeUsageService] Initial fetch failed — marking as disconnected")
+                        DebugLog.log("[ClaudeUsageService] Initial fetch failed — marking as disconnected")
                     }
                 }
             )
         } else {
-            print("[ClaudeUsageService] No OAuth credentials - will use extension/local data only")
+            DebugLog.log("[ClaudeUsageService] No OAuth credentials - will use extension/local data only")
         }
 
         // Start file monitoring
@@ -296,7 +296,7 @@ class ClaudeUsageService: ObservableObject {
     // MARK: - OAuth Usage (from Anthropic API)
 
     private func handleOAuthUsageData(_ snapshot: OAuthUsageSnapshot) {
-        print("[ClaudeUsageService \(ts())] OAUTH RECEIVED: session=\(snapshot.sessionPercent ?? -1)%, weekly=\(snapshot.weeklyAllPercent)%")
+        DebugLog.log("[ClaudeUsageService] OAUTH RECEIVED: session=\(snapshot.sessionPercent.map { "\($0)%" } ?? "none"), weekly=\(snapshot.weeklyAllPercent)%, \(snapshot.weeklyScopedModelName ?? "no scoped model")=\(snapshot.weeklySonnetPercent.map { "\($0)%" } ?? "none")")
         updateUsageData(oauthUsage: snapshot)
     }
 

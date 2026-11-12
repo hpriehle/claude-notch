@@ -2,7 +2,7 @@
 //  ClaudeOAuthCredentialStore.swift
 //  claudeNotch
 //
-//  Reads Claude Code CLI OAuth credentials from keychain or ~/.claude/.credentials.json
+//  Reads Claude Code CLI OAuth credentials from env, keychain or ~/.claude/.credentials.json
 //
 
 import Foundation
@@ -14,7 +14,11 @@ struct ClaudeOAuthCredentials {
     let refreshToken: String?
     let expiresAt: Date?
     let scopes: [String]?
+    /// Where the token came from ("env", "keychain", "file"), for diagnostics.
+    var source: String = "unknown"
 
+    /// Only true when a real expiry is known and has passed. A missing or zero
+    /// expiresAt means "unknown" and the token is still worth trying.
     var isExpired: Bool {
         guard let expiresAt = expiresAt else { return false }
         return expiresAt < Date()
@@ -29,12 +33,6 @@ class ClaudeOAuthCredentialStore {
     /// Claude Code's keychain service name
     private let keychainService = "Claude Code-credentials"
 
-    /// Claude Code's public OAuth client ID (used for token refresh)
-    private let oauthClientID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
-
-    /// Refresh endpoint
-    private let refreshURL = URL(string: "https://platform.claude.com/v1/oauth/token")!
-
     /// File path for credentials
     private var credentialsFilePath: URL {
         FileManager.default.homeDirectoryForCurrentUser
@@ -42,7 +40,7 @@ class ClaudeOAuthCredentialStore {
             .appendingPathComponent(".credentials.json")
     }
 
-    /// Cached credentials
+    /// Cached credentials (the last ones the API accepted, or the first candidate)
     private var cachedCredentials: ClaudeOAuthCredentials?
     private var cacheTimestamp: Date?
     private let cacheTTL: TimeInterval = 300 // 5 minutes
@@ -51,41 +49,51 @@ class ClaudeOAuthCredentialStore {
 
     // MARK: - Public API
 
-    /// Load credentials, trying keychain first then file
+    /// The preferred usable credentials (cached for a few minutes).
     func loadCredentials() -> ClaudeOAuthCredentials? {
-        // Check cache
         if let cached = cachedCredentials,
            let timestamp = cacheTimestamp,
            Date().timeIntervalSince(timestamp) < cacheTTL,
            !cached.isExpired {
             return cached
         }
+        guard let first = loadAllCredentials().first else { return nil }
+        cache(first)
+        return first
+    }
 
-        // Try env var first
-        if let token = ProcessInfo.processInfo.environment["CLAUDE_CODE_OAUTH_TOKEN"] {
-            let creds = ClaudeOAuthCredentials(
-                accessToken: token,
-                refreshToken: nil,
-                expiresAt: nil,
-                scopes: nil
-            )
-            cache(creds)
-            return creds
+    /// Every usable credential, in order of preference: env var, keychain, file.
+    /// Tokens with a known, passed expiry are skipped; duplicates are dropped.
+    ///
+    /// These tokens belong to Claude Code. This app never refreshes them: a
+    /// refresh rotates the refresh token and would sign Claude Code out. Claude
+    /// Code keeps the keychain entry current on its own.
+    func loadAllCredentials() -> [ClaudeOAuthCredentials] {
+        var candidates: [ClaudeOAuthCredentials] = []
+
+        if let token = ProcessInfo.processInfo.environment["CLAUDE_CODE_OAUTH_TOKEN"], !token.isEmpty {
+            candidates.append(ClaudeOAuthCredentials(
+                accessToken: token, refreshToken: nil, expiresAt: nil, scopes: nil, source: "env"))
         }
+        if let creds = loadFromKeychain() { candidates.append(creds) }
+        if let creds = loadFromFile() { candidates.append(creds) }
 
-        // Try keychain (via security CLI to avoid permission dialogs)
-        if let creds = loadFromKeychain() {
-            cache(creds)
-            return creds
+        var seen = Set<String>()
+        var usable: [ClaudeOAuthCredentials] = []
+        for c in candidates {
+            if c.isExpired {
+                DebugLog.log("[ClaudeOAuthCredentialStore] \(c.source) token expired at \(c.expiresAt!) - skipping")
+                continue
+            }
+            if seen.insert(c.accessToken).inserted { usable.append(c) }
         }
+        DebugLog.log("[ClaudeOAuthCredentialStore] usable credential sources: \(usable.map { $0.source })")
+        return usable
+    }
 
-        // Try credentials file
-        if let creds = loadFromFile() {
-            cache(creds)
-            return creds
-        }
-
-        return nil
+    /// Remember the credentials the API accepted.
+    func markWorking(_ creds: ClaudeOAuthCredentials) {
+        cache(creds)
     }
 
     /// Check if any credentials are available
@@ -97,64 +105,6 @@ class ClaudeOAuthCredentialStore {
     func invalidateCache() {
         cachedCredentials = nil
         cacheTimestamp = nil
-    }
-
-    /// Refresh an expired token
-    func refreshToken(using refreshToken: String) async -> ClaudeOAuthCredentials? {
-        var request = URLRequest(url: refreshURL)
-        request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-
-        let body = "grant_type=refresh_token&refresh_token=\(refreshToken)&client_id=\(oauthClientID)"
-        request.httpBody = body.data(using: .utf8)
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                print("[ClaudeOAuthCredentialStore] Token refresh failed: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
-                return nil
-            }
-
-            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-            guard let accessToken = json?["access_token"] as? String else {
-                print("[ClaudeOAuthCredentialStore] No access_token in refresh response")
-                return nil
-            }
-
-            let newRefreshToken = json?["refresh_token"] as? String ?? refreshToken
-            let expiresIn = json?["expires_in"] as? TimeInterval
-            let expiresAt = expiresIn.map { Date().addingTimeInterval($0) }
-
-            let creds = ClaudeOAuthCredentials(
-                accessToken: accessToken,
-                refreshToken: newRefreshToken,
-                expiresAt: expiresAt,
-                scopes: nil
-            )
-            cache(creds)
-            return creds
-        } catch {
-            print("[ClaudeOAuthCredentialStore] Token refresh error: \(error)")
-            return nil
-        }
-    }
-
-    /// Trigger Claude CLI to refresh its token by running `claude /status`
-    func triggerCLIRefresh() {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["claude", "/status"]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-            invalidateCache()
-        } catch {
-            print("[ClaudeOAuthCredentialStore] CLI refresh failed: \(error)")
-        }
     }
 
     // MARK: - Keychain Reading
@@ -174,7 +124,8 @@ class ClaudeOAuthCredentialStore {
             process.waitUntilExit()
 
             guard process.terminationStatus == 0 else {
-                print("[ClaudeOAuthCredentialStore] Keychain entry not found (status \(process.terminationStatus))")
+                // 36 = keychain locked (e.g. launched from an SSH session), 44 = no such item
+                DebugLog.log("[ClaudeOAuthCredentialStore] Keychain read failed (security exit \(process.terminationStatus))")
                 return nil
             }
 
@@ -184,9 +135,9 @@ class ClaudeOAuthCredentialStore {
                 return nil
             }
 
-            return parseCredentialsJSON(jsonString)
+            return parseCredentialsJSON(jsonString, source: "keychain")
         } catch {
-            print("[ClaudeOAuthCredentialStore] Keychain read error: \(error)")
+            DebugLog.log("[ClaudeOAuthCredentialStore] Keychain read error: \(error)")
             return nil
         }
     }
@@ -201,16 +152,16 @@ class ClaudeOAuthCredentialStore {
 
         do {
             let jsonString = try String(contentsOf: credentialsFilePath, encoding: .utf8)
-            return parseCredentialsJSON(jsonString)
+            return parseCredentialsJSON(jsonString, source: "file")
         } catch {
-            print("[ClaudeOAuthCredentialStore] File read error: \(error)")
+            DebugLog.log("[ClaudeOAuthCredentialStore] File read error: \(error)")
             return nil
         }
     }
 
     // MARK: - JSON Parsing
 
-    private func parseCredentialsJSON(_ jsonString: String) -> ClaudeOAuthCredentials? {
+    private func parseCredentialsJSON(_ jsonString: String, source: String) -> ClaudeOAuthCredentials? {
         guard let data = jsonString.data(using: .utf8) else { return nil }
 
         do {
@@ -218,20 +169,22 @@ class ClaudeOAuthCredentialStore {
 
             guard let oauthDict = json?["claudeAiOauth"] as? [String: Any],
                   let accessToken = oauthDict["accessToken"] as? String else {
-                print("[ClaudeOAuthCredentialStore] Missing claudeAiOauth.accessToken in credentials")
+                DebugLog.log("[ClaudeOAuthCredentialStore] Missing claudeAiOauth.accessToken in credentials")
                 return nil
             }
 
             let refreshToken = oauthDict["refreshToken"] as? String
-            let expiresAtMs = oauthDict["expiresAt"] as? Double
-            let expiresAt = expiresAtMs.map { Date(timeIntervalSince1970: $0 / 1000.0) }
+            // expiresAt is epoch milliseconds; 0 or missing means unknown.
+            let expiresAtMs = (oauthDict["expiresAt"] as? NSNumber)?.doubleValue ?? 0
+            let expiresAt = expiresAtMs > 0 ? Date(timeIntervalSince1970: expiresAtMs / 1000.0) : nil
             let scopes = oauthDict["scopes"] as? [String]
 
             return ClaudeOAuthCredentials(
                 accessToken: accessToken,
                 refreshToken: refreshToken,
                 expiresAt: expiresAt,
-                scopes: scopes
+                scopes: scopes,
+                source: source
             )
         } catch {
             print("[ClaudeOAuthCredentialStore] JSON parse error: \(error)")

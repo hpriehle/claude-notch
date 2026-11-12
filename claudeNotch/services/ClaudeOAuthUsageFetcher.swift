@@ -212,11 +212,38 @@ class ClaudeOAuthUsageFetcher {
             return lastSnapshot
         }
 
-        guard let credentials = await getValidCredentials() else {
-            print("[ClaudeOAuthUsageFetcher] No valid credentials available")
+        let candidates = credentialStore.loadAllCredentials()
+        guard !candidates.isEmpty else {
+            DebugLog.log("[ClaudeOAuthUsageFetcher] No credentials available (env, keychain, file)")
             return nil
         }
 
+        // Try each credential source in turn; a 401 moves on to the next one.
+        // Tokens are never refreshed here (see ClaudeOAuthCredentialStore).
+        for credentials in candidates {
+            switch await fetch(with: credentials) {
+            case .success(let snapshot):
+                credentialStore.markWorking(credentials)
+                return snapshot
+            case .unauthorized:
+                credentialStore.invalidateCache()
+                continue
+            case .done(let snapshot):
+                return snapshot
+            }
+        }
+        DebugLog.log("[ClaudeOAuthUsageFetcher] Every credential source was rejected (401). Open Claude Code once so it renews its sign-in.")
+        return nil
+    }
+
+    private enum FetchOutcome {
+        case success(OAuthUsageSnapshot)
+        case unauthorized
+        /// Stop trying other credentials and return this (possibly cached) value.
+        case done(OAuthUsageSnapshot?)
+    }
+
+    private func fetch(with credentials: ClaudeOAuthCredentials) async -> FetchOutcome {
         var request = URLRequest(url: usageURL)
         request.httpMethod = "GET"
         request.setValue("Bearer \(credentials.accessToken)", forHTTPHeaderField: "Authorization")
@@ -229,46 +256,46 @@ class ClaudeOAuthUsageFetcher {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
-                print("[ClaudeOAuthUsageFetcher] Invalid response type")
-                return nil
+                DebugLog.log("[ClaudeOAuthUsageFetcher] Invalid response type")
+                return .done(nil)
             }
+            DebugLog.log("[ClaudeOAuthUsageFetcher] GET /api/oauth/usage with \(credentials.source) token -> HTTP \(httpResponse.statusCode)")
 
             switch httpResponse.statusCode {
             case 200:
                 pollSkipsRemaining = 0  // Reset backoff on success
-                let snapshot = parseResponse(data)
-                if snapshot != nil { lastSnapshot = snapshot }
-                return snapshot
+                saveLastResponse(data)
+                guard let snapshot = parseResponse(data) else { return .done(nil) }
+                lastSnapshot = snapshot
+                return .success(snapshot)
             case 401:
-                print("[ClaudeOAuthUsageFetcher] 401 Unauthorized - attempting token refresh")
-                credentialStore.invalidateCache()
-                // Try refresh
-                if let refreshToken = credentials.refreshToken {
-                    if let newCreds = await credentialStore.refreshToken(using: refreshToken) {
-                        return await fetchWithToken(newCreds.accessToken)
-                    }
-                }
-                // Fallback: trigger CLI refresh
-                credentialStore.triggerCLIRefresh()
-                return nil
+                return .unauthorized
             case 429:
                 pollSkipsRemaining = 2  // Skip next 2 polls (~4 min cooldown)
-                print("[ClaudeOAuthUsageFetcher] 429 Rate limited - backing off for \(pollSkipsRemaining) polls, returning cached data")
+                DebugLog.log("[ClaudeOAuthUsageFetcher] 429 Rate limited - backing off for \(pollSkipsRemaining) polls, returning cached data")
                 // Try to parse body (some APIs include data in 429), otherwise use cache
                 if let snapshot = parseResponse(data) {
                     lastSnapshot = snapshot
-                    return snapshot
+                    return .done(snapshot)
                 }
-                return lastSnapshot
+                return .done(lastSnapshot)
             default:
                 let body = String(data: data, encoding: .utf8) ?? "<no body>"
-                print("[ClaudeOAuthUsageFetcher] HTTP \(httpResponse.statusCode): \(body)")
-                return lastSnapshot
+                DebugLog.log("[ClaudeOAuthUsageFetcher] HTTP \(httpResponse.statusCode): \(body.prefix(300))")
+                return .done(lastSnapshot)
             }
         } catch {
-            print("[ClaudeOAuthUsageFetcher] Request error: \(error)")
-            return nil
+            DebugLog.log("[ClaudeOAuthUsageFetcher] Request error: \(error)")
+            return .done(nil)
         }
+    }
+
+    /// Keeps the latest raw API response in Application Support for diagnostics.
+    private func saveLastResponse(_ data: Data) {
+        let dir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/claudeNotch")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? data.write(to: dir.appendingPathComponent("last_api_response.json"), options: .atomic)
     }
 
     /// Whether credentials are available (doesn't make a network call)
@@ -308,43 +335,6 @@ class ClaudeOAuthUsageFetcher {
 
     // MARK: - Private
 
-    private func getValidCredentials() async -> ClaudeOAuthCredentials? {
-        guard let creds = credentialStore.loadCredentials() else {
-            return nil
-        }
-
-        // If expired, try to refresh
-        if creds.isExpired {
-            if let refreshToken = creds.refreshToken {
-                return await credentialStore.refreshToken(using: refreshToken)
-            }
-            // No refresh token — trigger CLI refresh and re-read
-            credentialStore.triggerCLIRefresh()
-            return credentialStore.loadCredentials()
-        }
-
-        return creds
-    }
-
-    private func fetchWithToken(_ token: String) async -> OAuthUsageSnapshot? {
-        var request = URLRequest(url: usageURL)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
-        request.setValue("claude-code/1.0.0", forHTTPHeaderField: "User-Agent")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.timeoutInterval = 10
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else { return nil }
-            return parseResponse(data)
-        } catch {
-            return nil
-        }
-    }
-
     /// Normalizes a utilization value to integer percentage (0–100).
     /// The API returns utilization as percentages (0–100).
     private func normalizeUtilization(_ value: Double) -> Int {
@@ -352,10 +342,6 @@ class ClaudeOAuthUsageFetcher {
     }
 
     private func parseResponse(_ data: Data) -> OAuthUsageSnapshot? {
-        // DIAGNOSTIC — write raw response to /tmp/oauth_debug.json
-        if let raw = String(data: data, encoding: .utf8) {
-            try? raw.write(toFile: "/tmp/oauth_debug.json", atomically: true, encoding: .utf8)
-        }
         do {
             let response = try JSONDecoder().decode(OAuthUsageResponse.self, from: data)
 
@@ -370,7 +356,7 @@ class ClaudeOAuthUsageFetcher {
                || response.sevenDaySonnet?.utilization != nil
                || response.sevenDayOpus?.utilization != nil
                || response.iguanaNecktie?.utilization != nil else {
-                print("[ClaudeOAuthUsageFetcher] Response has no rate windows — likely an error body")
+                DebugLog.log("[ClaudeOAuthUsageFetcher] Response has no rate windows — likely an error body")
                 return nil
             }
 
@@ -422,7 +408,7 @@ class ClaudeOAuthUsageFetcher {
             }
 
             let fields = "[OAuth FIELDS] session=\(sessionPercent as Any) weekly_all=\(weeklyAllPercent) scoped=\(weeklySonnetPercent as Any) (\(weeklyScopedModelName ?? "-")) opus=\(weeklyOpusPercent as Any) limits=\(limits?.count ?? -1)"
-            try? fields.write(toFile: "/tmp/oauth_fields.txt", atomically: true, encoding: .utf8)
+            DebugLog.log(fields)
 
             // Incident detection: if aggregate fields are reported as 0 but
             // model-specific fields have real data, the API is partially broken.
@@ -461,7 +447,7 @@ class ClaudeOAuthUsageFetcher {
             print("[ClaudeOAuthUsageFetcher] Fetched: session=\(sessionPercent.map { "\($0)%" } ?? "none"), weekly=\(weeklyAllPercent)%")
             return snapshot
         } catch {
-            print("[ClaudeOAuthUsageFetcher] Parse error: \(error)")
+            DebugLog.log("[ClaudeOAuthUsageFetcher] Parse error: \(error)")
             if let raw = String(data: data, encoding: .utf8) {
                 print("[ClaudeOAuthUsageFetcher] Raw response: \(raw.prefix(500))")
             }
