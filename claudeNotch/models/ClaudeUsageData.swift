@@ -71,7 +71,6 @@ struct ClaudeUsageData: Codable, Equatable {
         return oauthSessionPercent == nil && oauthWeeklyAllPercent != nil
     }
 
-    static let noSessionLimitText = "Session: no 5-hour limit on Ultra"
 
     var hasCodeData: Bool {
         return codeWeeklyTokens != nil && codeWeeklyTokens! > 0

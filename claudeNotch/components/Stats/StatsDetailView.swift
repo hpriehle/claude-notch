@@ -105,11 +105,6 @@ struct StatsDetailView: View {
                             resetTime: vm.usageData.displaySessionResetTime,
                             prediction: nil  // Session is short-term, no velocity prediction
                         )
-                    } else if vm.usageData.hasNoSessionLimit {
-                        Text(ClaudeUsageData.noSessionLimitText)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white.opacity(0.6))
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 } else {
                     // No API or web data - show prompt

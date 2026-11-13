@@ -146,11 +146,6 @@ struct ClaudeUsageView: View {
                         resetTime: vm.usageData.displaySessionResetTime,
                         color: vm.usageData.colorForPercent(sessionPercent)
                     )
-                } else if Defaults[.showSessionUsage], vm.usageData.hasNoSessionLimit {
-                    Text(ClaudeUsageData.noSessionLimitText)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.gray)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 // Weekly All Models Usage
