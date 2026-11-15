@@ -205,7 +205,6 @@ struct RateLimitRow: View {
     let prediction: String?
 
     @State private var displayedResetTime: String = ""
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -247,10 +246,7 @@ struct RateLimitRow: View {
                     .frame(width: 36, alignment: .trailing)
             }
         }
-        .onAppear {
-            displayedResetTime = ClaudeUsageData.formatShortResetTime(resetTime)
-        }
-        .onReceive(timer) { _ in
+        .countdownTicks(until: resetTime) {
             displayedResetTime = ClaudeUsageData.formatShortResetTime(resetTime)
         }
     }

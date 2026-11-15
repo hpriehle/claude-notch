@@ -8,6 +8,7 @@ import SwiftUI
 
 struct MinimalFaceFeatures: View {
     @State private var isBlinking = false
+    @ObservedObject private var motionPolicy = MotionPolicy.shared
     @State var height:CGFloat = 20;
     @State var width:CGFloat = 30;
     
@@ -40,21 +41,26 @@ struct MinimalFaceFeatures: View {
             }
         }
         .frame(width: self.width, height: self.height) // Maximum size of face
-        .onAppear {
-            startBlinking()
+        // One blink loop per visible face: it is cancelled when the face disappears and
+        // restarts when the motion policy changes (Reduce Motion, Low Power, display asleep).
+        .task(id: motionPolicy.allowsDecorativeAnimation) {
+            await blinkLoop()
         }
     }
-    
-    func startBlinking() {
+
+    private func blinkLoop() async {
+        guard motionPolicy.allowsDecorativeAnimation else { return }
         DebugHooks.timerStarted("faceBlink")
-        Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
+        defer { DebugHooks.timerStopped("faceBlink") }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
             withAnimation(.spring(duration: 0.2)) {
                 isBlinking = true
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.spring(duration: 0.2)) {
-                    isBlinking = false
-                }
+            try? await Task.sleep(for: .milliseconds(100))
+            withAnimation(.spring(duration: 0.2)) {
+                isBlinking = false
             }
         }
     }

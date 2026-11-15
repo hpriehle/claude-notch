@@ -108,11 +108,16 @@ struct ClaudeUsageView: View {
                 Button(action: {
                     usageService.refresh()
                 }) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(usageService.isRefreshing ? .white : .gray)
-                        .rotationEffect(.degrees(usageService.isRefreshing ? 360 : 0))
-                        .animation(usageService.isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: usageService.isRefreshing)
+                    // Spins only while refreshing: the timeline is paused (no frames at all) otherwise,
+                    // unlike a repeatForever animation, which can keep running after the flag flips back.
+                    TimelineView(.animation(paused: !usageService.isRefreshing)) { context in
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(usageService.isRefreshing ? .white : .gray)
+                            .rotationEffect(.degrees(usageService.isRefreshing
+                                ? context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1) * 360
+                                : 0))
+                    }
                 }
                 .buttonStyle(.plain)
                 .disabled(usageService.isRefreshing)
@@ -307,7 +312,6 @@ struct UsageBarView: View {
     let color: Color
 
     @State private var displayedResetTime: String = ""
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -345,10 +349,7 @@ struct UsageBarView: View {
                 .font(.system(size: 14, weight: .bold, design: .rounded))
                 .foregroundColor(color)
         }
-        .onAppear {
-            displayedResetTime = ClaudeUsageData.formatResetTime(resetTime)
-        }
-        .onReceive(timer) { _ in
+        .countdownTicks(until: resetTime) {
             displayedResetTime = ClaudeUsageData.formatResetTime(resetTime)
         }
     }
@@ -465,7 +466,6 @@ struct ExtraUsageCountdownView: View {
     let endsAt: Date
 
     @State private var displayText: String = ""
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: 6) {
@@ -481,8 +481,7 @@ struct ExtraUsageCountdownView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.yellow.opacity(0.1))
         .cornerRadius(8)
-        .onAppear { updateText() }
-        .onReceive(timer) { _ in updateText() }
+        .countdownTicks(until: endsAt, showsSeconds: false) { updateText() }
     }
 
     private func updateText() {

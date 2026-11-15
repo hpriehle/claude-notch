@@ -14,7 +14,6 @@ struct ClaudeCompactView: View {
     @ObservedObject private var extraUsage = ExtraUsageService.shared
 
     @State private var displayedResetTime: String = ""
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
         HStack(spacing: 8) {
@@ -92,10 +91,7 @@ struct ClaudeCompactView: View {
             }
         }
         .padding(.horizontal, 12)
-        .onAppear {
-            updateResetTime()
-        }
-        .onReceive(timer) { _ in
+        .countdownTicks(until: vm.usageData.displaySessionResetTime ?? vm.usageData.displayWeeklyAllResetTime) {
             updateResetTime()
         }
     }

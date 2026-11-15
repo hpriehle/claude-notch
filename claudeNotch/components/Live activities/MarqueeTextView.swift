@@ -76,7 +76,9 @@ struct MarqueeText: View {
                     self.animate = false
                     self.offset = 0
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.01){
-                        if needsScrolling {
+                        // Scroll only when the text overflows and decorative motion is allowed
+                        // (not with Reduce Motion, Low Power Mode, or the display asleep/locked).
+                        if needsScrolling && MotionPolicy.shared.allowsDecorativeAnimation {
                             self.animate = true
                             self.offset = -(textSize.width + 10)
                             
@@ -86,6 +88,11 @@ struct MarqueeText: View {
             }
             .frame(width: frameWidth, alignment: .leading)
             .clipped()
+        }
+        .onDisappear {
+            // Stop the repeatForever scroll when the text leaves the screen.
+            animate = false
+            offset = 0
         }
         .frame(height: textSize.height * 1.3)
         
