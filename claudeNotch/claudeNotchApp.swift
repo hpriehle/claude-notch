@@ -11,6 +11,8 @@ import Combine
 import Defaults
 import KeyboardShortcuts
 import Sparkle
+import notify
+import os
 import SwiftUI
 
 @main
@@ -358,6 +360,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         _ = UsageNotificationManager.shared
 
         previousScreens = NSScreen.screens
+
+        installDebugHooksIfEnabled()
+    }
+
+    /// Hidden hooks for idle-cost testing (see DebugHooks.swift). Off unless the defaults flag is set.
+    private func installDebugHooksIfEnabled() {
+        guard DebugHooks.isEnabled else { return }
+        DebugHooks.report("debug hooks installed")
+        var token: Int32 = 0
+        notify_register_dispatch(DebugHooks.toggleNotification, &token, .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self = self else { return }
+                if self.vm.notchState == .closed {
+                    withAnimation(.interactiveSpring(response: 0.38, dampingFraction: 0.8, blendDuration: 0)) {
+                        self.vm.open()
+                    }
+                } else {
+                    self.vm.close()
+                }
+            }
+        }
+        notify_register_dispatch(DebugHooks.reportNotification, &token, .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                DebugHooks.report("notchState=\(self?.vm.notchState == .open ? "open" : "closed")")
+            }
+        }
     }
 
     func playWelcomeSound() {
@@ -563,5 +591,36 @@ extension CGRect: @retroactive Hashable {
 
     public static func == (lhs: CGRect, rhs: CGRect) -> Bool {
         return lhs.origin == rhs.origin && lhs.size == rhs.size
+    }
+}
+
+// MARK: - Debug hooks
+//  Hidden test hooks for measuring idle cost without touching the mouse.
+//  Off by default: they only listen when the defaults flag is set, e.g.
+//    defaults write com.harrison.claudenotch debugHooksEnabled -bool true
+//  then (re)launch the app and post the Darwin notifications below (works from ssh too):
+//    notifyutil -p com.harrison.claudenotch.debug.toggle   # open/close the notch
+//    notifyutil -p com.harrison.claudenotch.debug.report   # log live view timers (log show --predicate 'eventMessage CONTAINS "DEBUG-REPORT"')
+//
+
+
+enum DebugHooks {
+    static let enabledKey = "debugHooksEnabled"
+    static let toggleNotification = "com.harrison.claudenotch.debug.toggle"
+    static let reportNotification = "com.harrison.claudenotch.debug.report"
+
+    static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
+
+    private static let log = Logger(subsystem: "com.harrison.claudenotch", category: "debug")
+
+    /// Live repeating timers / loops owned by views. Only touched on the main thread.
+    @MainActor static var liveViewTimers: [String: Int] = [:]
+
+    @MainActor static func timerStarted(_ name: String) { liveViewTimers[name, default: 0] += 1 }
+    @MainActor static func timerStopped(_ name: String) { liveViewTimers[name, default: 0] -= 1 }
+
+    @MainActor static func report(_ extra: String) {
+        let timers = liveViewTimers.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: " ")
+        log.notice("DEBUG-REPORT \(extra, privacy: .public) liveViewTimers: \(timers.isEmpty ? "none" : timers, privacy: .public)")
     }
 }

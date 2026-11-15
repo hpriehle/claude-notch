@@ -46,6 +46,7 @@ struct MinimalFaceFeatures: View {
     }
     
     func startBlinking() {
+        DebugHooks.timerStarted("faceBlink")
         Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
             withAnimation(.spring(duration: 0.2)) {
                 isBlinking = true
